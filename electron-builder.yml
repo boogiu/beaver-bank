@@ -1,0 +1,27 @@
+appId: com.boogiu.beaverbank
+productName: BeaverBank
+directories:
+  buildResources: build
+  output: release/${version}
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!drizzle/*'
+  - '!{electron.vite.config,drizzle.config}.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+# DB 마이그레이션 SQL은 앱 시작 시 읽어야 하므로 resources/drizzle로 복사한다.
+extraResources:
+  - from: drizzle
+    to: drizzle
+asarUnpack:
+  - resources/**
+win:
+  executableName: BeaverBank
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+npmRebuild: false

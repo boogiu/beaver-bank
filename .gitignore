@@ -1,12 +1,12 @@
 # ── 의존성 ──
 node_modules/
 
-# ── 빌드 결과물 ──
+# ── 빌드 결과물 ── (build/는 아이콘 등 빌드 리소스라 커밋 대상)
 out/
 dist/
 release/
-build/
 *.tsbuildinfo
+.eslintcache
 
 # ── 개인 금융 데이터 (절대 커밋 금지) ──
 *.sqlite
@@ -18,8 +18,8 @@ build/
 *.db-journal
 *.db-wal
 *.db-shm
-data/
-backup/
+/data/
+/backup/
 *.bak
 
 # ── 비밀 정보 (API 키 등) ──
@@ -28,6 +28,7 @@ backup/
 !.env.example
 
 # ── 로그 ──
+.skywork/
 logs/
 *.log
 npm-debug.log*
