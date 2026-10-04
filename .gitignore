@@ -1,0 +1,47 @@
+# ── 의존성 ──
+node_modules/
+
+# ── 빌드 결과물 ──
+out/
+dist/
+release/
+build/
+*.tsbuildinfo
+
+# ── 개인 금융 데이터 (절대 커밋 금지) ──
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+backup/
+*.bak
+
+# ── 비밀 정보 (API 키 등) ──
+.env
+.env.*
+!.env.example
+
+# ── 로그 ──
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ── 에디터 / OS ──
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Claude Code 로컬 설정 ──
+.claude/settings.local.json
