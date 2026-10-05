@@ -19,7 +19,14 @@ const api: Api = {
   addCard: (input) => ipcRenderer.invoke('card:add', input),
   updateCard: (id, input) => ipcRenderer.invoke('card:update', id, input),
   closeCard: (id) => ipcRenderer.invoke('card:close', id),
-  restoreCard: (id) => ipcRenderer.invoke('card:restore', id)
+  restoreCard: (id) => ipcRenderer.invoke('card:restore', id),
+  listFlows: (includeEnded) => ipcRenderer.invoke('flow:list', includeEnded),
+  addFlow: (input) => ipcRenderer.invoke('flow:add', input),
+  updateFlow: (id, input, effectiveStartDate) =>
+    ipcRenderer.invoke('flow:update', id, input, effectiveStartDate),
+  endFlow: (id, endDate) => ipcRenderer.invoke('flow:end', id, endDate),
+  resumeFlow: (id) => ipcRenderer.invoke('flow:resume', id),
+  deleteFlow: (id) => ipcRenderer.invoke('flow:delete', id)
 }
 
 // contextIsolation이 켜져 있으면 contextBridge로 노출하고, 아니면 window에 직접 붙인다.

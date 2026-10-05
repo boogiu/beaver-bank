@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CreditCard, GitBranch, Info, Landmark, Tags } from 'lucide-react'
+import { CreditCard, GitBranch, Info, Landmark, Tags, Repeat } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import mascot from './assets/illustrations/M1-C-mascot-a2.png'
 import { Icon } from './components/Ui'
@@ -8,6 +8,7 @@ import CardsPage from './pages/CardsPage'
 import PurposesPage from './pages/PurposesPage'
 import GraphPage from './pages/GraphPage'
 import InfoPage from './pages/InfoPage'
+import FlowsPage from './pages/FlowsPage'
 
 export type PageId = string
 export type NavigationTarget = {
@@ -31,6 +32,7 @@ const MENU: {
   { id: 'accounts', label: '계좌', icon: Landmark, component: AccountsPage },
   { id: 'cards', label: '카드', icon: CreditCard, component: CardsPage },
   { id: 'purposes', label: '용도', icon: Tags, component: PurposesPage },
+  { id: 'flows', label: '흐름', icon: Repeat, component: FlowsPage },
   { id: 'graph', label: '그래프', icon: GitBranch, component: GraphPage },
   { id: 'info', label: '정보', icon: Info, component: InfoPage }
 ]

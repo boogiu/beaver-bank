@@ -6,13 +6,15 @@ import type {
   ApiError,
   Card,
   CardInput,
+  Flow,
+  FlowInput,
   Purpose,
   PurposeInput,
   Result,
   SavingsInput
 } from '../../shared/ipc'
 import { openDatabase } from './index'
-import { accounts, cards, purposes, savingsDetails } from './schema'
+import { accounts, cards, flowOverrides, flows, purposes, savingsDetails } from './schema'
 
 class ServiceError extends Error {
   constructor(
@@ -164,7 +166,7 @@ export function attempt<T>(work: () => T): Result<T> {
   } catch (error) {
     if (error instanceof ServiceError)
       return { ok: false, error: { kind: error.kind, message: error.message, field: error.field } }
-    if (error instanceof Error && error.message.includes('UNIQUE constraint'))
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed: purposes.name'))
       return {
         ok: false,
         error: { kind: 'duplicate', message: '같은 이름이 이미 있습니다.', field: 'name' }
@@ -261,6 +263,11 @@ export function reorderPurposes(ids: number[]): void {
 
 export function listAccounts(includeInactive = false): Account[] {
   const db = openDatabase()
+  const currentFlows = db
+    .select()
+    .from(flows)
+    .all()
+    .filter((flow) => flowStatus(flow.startDate, flow.endDate) !== 'ended')
   const rows = db
     .select({ account: accounts, saving: savingsDetails })
     .from(accounts)
@@ -279,6 +286,18 @@ export function listAccounts(includeInactive = false): Account[] {
       memo: account.memo,
       isActive: account.isActive,
       sortOrder: account.sortOrder,
+      flowCount: currentFlows.filter(
+        (flow) => flow.fromAccountId === account.id || flow.toAccountId === account.id
+      ).length,
+      monthlyContribution: currentFlows
+        .filter(
+          (flow) =>
+            flow.kind === 'transfer' &&
+            flow.cycle === 'monthly' &&
+            flow.toAccountId === account.id &&
+            flowStatus(flow.startDate, flow.endDate) === 'active'
+        )
+        .reduce((sum, flow) => sum + flow.amount, 0),
       savings: saving && {
         startDate: saving.startDate,
         maturityDate: saving.maturityDate,
@@ -341,7 +360,13 @@ export function setAccountActive(id: number, active: boolean): void {
 }
 
 export function listCards(includeInactive = false): Card[] {
-  const rows = openDatabase()
+  const db = openDatabase()
+  const currentFlows = db
+    .select()
+    .from(flows)
+    .all()
+    .filter((flow) => flowStatus(flow.startDate, flow.endDate) !== 'ended')
+  const rows = db
     .select({ card: cards, linked: accounts })
     .from(cards)
     .leftJoin(accounts, eq(cards.accountId, accounts.id))
@@ -359,6 +384,8 @@ export function listCards(includeInactive = false): Card[] {
       numberTail: card.numberTail,
       memo: card.memo,
       isActive: card.isActive,
+      flowCount: currentFlows.filter((flow) => flow.kind === 'payment' && flow.cardId === card.id)
+        .length,
       linkedAccount: linked && { name: linked.name, bank: linked.bank, isActive: linked.isActive }
     }))
 }
@@ -388,4 +415,222 @@ export function setCardActive(id: number, active: boolean): void {
     .where(eq(cards.id, id))
     .run()
   if (!result.changes) missing()
+}
+
+const flowCategories: Record<FlowInput['kind'], FlowInput['category'][]> = {
+  income: ['salary', 'other'],
+  transfer: ['savings', 'allocation', 'other'],
+  payment: ['subscription', 'insurance', 'telecom', 'utility', 'loan', 'other']
+}
+const today = (): string => {
+  const date = new Date()
+  const year = date.getFullYear()
+  return `${year.toString().padStart(4, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+const flowStatus = (startDate: string, endDate: string | null): Flow['status'] => {
+  const now = today()
+  return endDate !== null && endDate <= now ? 'ended' : startDate > now ? 'scheduled' : 'active'
+}
+const previousDay = (value: string): string => {
+  const date = new Date(`${value}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() - 1)
+  return date.toISOString().slice(0, 10)
+}
+const validateFlow = (input: FlowInput, previous?: Flow): FlowInput => {
+  if (!input || typeof input !== 'object') invalid('name', '흐름 정보를 입력해 주세요.')
+  const cleaned: FlowInput = {
+    name: name(input.name, 'name', '흐름 이름', 30),
+    kind: input.kind,
+    amount: input.amount,
+    isVariable: input.isVariable,
+    fromAccountId: input.fromAccountId,
+    toAccountId: input.toAccountId,
+    cardId: input.cardId,
+    category: input.category,
+    cycle: input.cycle,
+    day: input.day,
+    month: input.month,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    memo: input.memo
+  }
+  if (!Object.hasOwn(flowCategories, cleaned.kind)) invalid('kind', '흐름 종류를 선택해 주세요.')
+  if (previous && cleaned.kind !== previous.kind) invalid('kind', '흐름 종류는 바꿀 수 없습니다.')
+  if (!Number.isSafeInteger(cleaned.amount) || cleaned.amount < 0)
+    invalid('amount', '금액은 0원 이상의 정수로 입력해 주세요.')
+  if (typeof cleaned.isVariable !== 'boolean')
+    invalid('isVariable', '변동 금액 여부를 선택해 주세요.')
+  if (!flowCategories[cleaned.kind].includes(cleaned.category))
+    invalid('category', '종류에 맞는 분류를 선택해 주세요.')
+  if (cleaned.cycle !== 'monthly' && cleaned.cycle !== 'yearly')
+    invalid('cycle', '주기를 선택해 주세요.')
+  if (!Number.isInteger(cleaned.day) || cleaned.day < 1 || cleaned.day > 31)
+    invalid('day', '지정일은 1~31의 정수로 입력해 주세요.')
+  if (cleaned.cycle === 'monthly') {
+    if (cleaned.month !== null) invalid('month', '매월 흐름에는 지정 월을 입력할 수 없습니다.')
+  } else if (!Number.isInteger(cleaned.month) || cleaned.month! < 1 || cleaned.month! > 12)
+    invalid('month', '지정 월은 1~12의 정수로 입력해 주세요.')
+  if (!realDate(cleaned.startDate))
+    invalid('startDate', '시작일은 실제 날짜를 YYYY-MM-DD로 입력해 주세요.')
+  if (
+    cleaned.endDate !== null &&
+    (!realDate(cleaned.endDate) || cleaned.endDate < cleaned.startDate)
+  )
+    invalid('endDate', '종료일은 시작일 이후의 실제 날짜여야 합니다.')
+  cleaned.memo = optional(cleaned.memo, 'memo', 200)
+  for (const field of ['fromAccountId', 'toAccountId', 'cardId'] as const)
+    reference(cleaned[field], field)
+  if (cleaned.kind === 'income') {
+    if (cleaned.fromAccountId !== null)
+      invalid('fromAccountId', '수입에는 보내는 계좌를 넣을 수 없습니다.')
+    if (cleaned.toAccountId === null) invalid('toAccountId', '받는 계좌를 선택해 주세요.')
+  } else if (cleaned.kind === 'transfer') {
+    if (cleaned.fromAccountId === null) invalid('fromAccountId', '보내는 계좌를 선택해 주세요.')
+    if (cleaned.toAccountId === null) invalid('toAccountId', '받는 계좌를 선택해 주세요.')
+    if (cleaned.fromAccountId === cleaned.toAccountId)
+      invalid('toAccountId', '서로 다른 계좌를 선택해 주세요.')
+  } else {
+    if (cleaned.fromAccountId === null) invalid('fromAccountId', '보내는 계좌를 선택해 주세요.')
+    if (cleaned.toAccountId !== null)
+      invalid('toAccountId', '정기 결제에는 받는 계좌를 넣을 수 없습니다.')
+  }
+  if (cleaned.kind !== 'payment' && cleaned.cardId !== null)
+    invalid('cardId', '결제 카드는 정기 결제에만 지정할 수 있습니다.')
+  const db = openDatabase()
+  for (const field of ['fromAccountId', 'toAccountId'] as const) {
+    const id = cleaned[field]
+    if (id === null) continue
+    const account = db
+      .select({ isActive: accounts.isActive })
+      .from(accounts)
+      .where(eq(accounts.id, id))
+      .get()
+    if (!account) return invalid(field, '존재하는 계좌를 선택해 주세요.')
+    if (!account.isActive && id !== previous?.[field])
+      invalid(field, '해지 계좌는 새로 선택할 수 없습니다.')
+  }
+  if (cleaned.cardId !== null) {
+    const card = db
+      .select({ isActive: cards.isActive })
+      .from(cards)
+      .where(eq(cards.id, cleaned.cardId))
+      .get()
+    if (!card) return invalid('cardId', '존재하는 결제 카드를 선택해 주세요.')
+    if (!card.isActive && cleaned.cardId !== previous?.cardId)
+      invalid('cardId', '해지 카드는 새로 선택할 수 없습니다.')
+  }
+  return cleaned
+}
+
+export function listFlows(includeEnded = false): Flow[] {
+  const db = openDatabase()
+  const accountMap = new Map(
+    db
+      .select()
+      .from(accounts)
+      .all()
+      .map((item) => [item.id, item])
+  )
+  const cardMap = new Map(
+    db
+      .select()
+      .from(cards)
+      .all()
+      .map((item) => [item.id, item])
+  )
+  const counts = new Map<number, number>()
+  for (const item of db.select({ flowId: flowOverrides.flowId }).from(flowOverrides).all())
+    counts.set(item.flowId, (counts.get(item.flowId) ?? 0) + 1)
+  const linkedAccount = (id: number | null): Flow['fromAccount'] => {
+    const item = id === null ? null : accountMap.get(id)
+    return item ? { name: item.name, bank: item.bank, isActive: item.isActive } : null
+  }
+  const linkedCard = (id: number | null): Flow['card'] => {
+    const item = id === null ? null : cardMap.get(id)
+    return item ? { name: item.name, issuer: item.issuer, isActive: item.isActive } : null
+  }
+  return db
+    .select()
+    .from(flows)
+    .orderBy(asc(flows.id))
+    .all()
+    .map((item) => ({
+      ...item,
+      status: flowStatus(item.startDate, item.endDate),
+      fromAccount: linkedAccount(item.fromAccountId),
+      toAccount: linkedAccount(item.toAccountId),
+      card: linkedCard(item.cardId),
+      overrideCount: counts.get(item.id) ?? 0,
+      sortOrder: item.id
+    }))
+    .filter((item) => includeEnded || item.status !== 'ended')
+}
+export function addFlow(input: FlowInput): Flow {
+  const cleaned = validateFlow(input)
+  const id = openDatabase().insert(flows).values(cleaned).returning({ id: flows.id }).get().id
+  return listFlows(true).find((item) => item.id === id)!
+}
+export function updateFlow(id: number, input: FlowInput, effectiveStartDate?: string | null): Flow {
+  validId(id)
+  const db = openDatabase()
+  const previous = listFlows(true).find((item) => item.id === id)
+  if (!previous) return missing('id')
+  const cleaned = validateFlow(input, previous)
+  const changed = (
+    ['amount', 'cycle', 'month', 'day', 'fromAccountId', 'toAccountId'] as const
+  ).some((field) => cleaned[field] !== previous[field])
+  if (
+    changed &&
+    (!effectiveStartDate ||
+      !realDate(effectiveStartDate) ||
+      effectiveStartDate < cleaned.startDate ||
+      (cleaned.endDate !== null && effectiveStartDate > cleaned.endDate))
+  )
+    invalid('effectiveStartDate', '적용 시작일은 시작일과 종료일 사이의 실제 날짜여야 합니다.')
+  if (!changed || effectiveStartDate === cleaned.startDate) {
+    db.update(flows).set(cleaned).where(eq(flows.id, id)).run()
+    return listFlows(true).find((item) => item.id === id)!
+  }
+  const splitDate = effectiveStartDate!
+  const oldPart = {
+    name: cleaned.name,
+    category: cleaned.category,
+    isVariable: cleaned.isVariable,
+    cardId: cleaned.cardId,
+    startDate: cleaned.startDate,
+    endDate: previousDay(splitDate),
+    memo: cleaned.memo
+  }
+  const newId = db.transaction((tx) => {
+    tx.update(flows).set(oldPart).where(eq(flows.id, id)).run()
+    return tx
+      .insert(flows)
+      .values({ ...cleaned, startDate: splitDate })
+      .returning({ id: flows.id })
+      .get().id
+  })
+  return listFlows(true).find((item) => item.id === newId)!
+}
+export function endFlow(id: number, endDate: string): void {
+  validId(id)
+  const db = openDatabase()
+  const row = db.select({ startDate: flows.startDate }).from(flows).where(eq(flows.id, id)).get()
+  if (!row) return missing('id')
+  if (!realDate(endDate) || endDate < row.startDate)
+    invalid('endDate', '종료일은 시작일 이후의 실제 날짜여야 합니다.')
+  db.update(flows).set({ endDate }).where(eq(flows.id, id)).run()
+}
+export function resumeFlow(id: number): void {
+  validId(id)
+  const result = openDatabase().update(flows).set({ endDate: null }).where(eq(flows.id, id)).run()
+  if (!result.changes) missing('id')
+}
+export function deleteFlow(id: number): void {
+  validId(id)
+  const db = openDatabase()
+  db.transaction((tx) => {
+    if (!tx.select({ id: flows.id }).from(flows).where(eq(flows.id, id)).get()) missing('id')
+    tx.delete(flowOverrides).where(eq(flowOverrides.flowId, id)).run()
+    tx.delete(flows).where(eq(flows.id, id)).run()
+  })
 }

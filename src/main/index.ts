@@ -70,6 +70,18 @@ function registerIpc(): void {
   )
   ipcMain.handle('card:close', (_, id) => service.attempt(() => service.setCardActive(id, false)))
   ipcMain.handle('card:restore', (_, id) => service.attempt(() => service.setCardActive(id, true)))
+  ipcMain.handle('flow:list', (_, includeEnded) =>
+    service.attempt(() => service.listFlows(includeEnded))
+  )
+  ipcMain.handle('flow:add', (_, input) => service.attempt(() => service.addFlow(input)))
+  ipcMain.handle('flow:update', (_, id, input, effectiveStartDate) =>
+    service.attempt(() => service.updateFlow(id, input, effectiveStartDate))
+  )
+  ipcMain.handle('flow:end', (_, id, endDate) =>
+    service.attempt(() => service.endFlow(id, endDate))
+  )
+  ipcMain.handle('flow:resume', (_, id) => service.attempt(() => service.resumeFlow(id)))
+  ipcMain.handle('flow:delete', (_, id) => service.attempt(() => service.deleteFlow(id)))
 }
 
 app.whenReady().then(() => {

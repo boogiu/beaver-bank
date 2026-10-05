@@ -9,7 +9,8 @@ import {
   Wallet
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { AccountType, CardType } from '@shared/domain'
+import type { AccountType, CardType, FlowCategory, FlowKind } from '@shared/domain'
+import { ArrowLeftRight, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 
 export const ACCOUNT_INFO: Record<AccountType, { label: string; icon: LucideIcon }> = {
   checking: { label: '입출금', icon: Wallet },
@@ -24,3 +25,19 @@ export const CARD_INFO: Record<CardType, { label: string; icon: LucideIcon }> = 
   credit: { label: '신용카드', icon: ChartNoAxesCombined }
 }
 export const money = (amount: number): string => `${amount.toLocaleString('ko-KR')}원`
+export const FLOW_INFO: Record<FlowKind, { label: string; icon: LucideIcon }> = {
+  income: { label: '수입', icon: ArrowDownLeft },
+  transfer: { label: '이체', icon: ArrowLeftRight },
+  payment: { label: '정기 결제', icon: ArrowUpRight }
+}
+export const FLOW_CATEGORY: Record<FlowCategory, string> = {
+  salary: '급여',
+  savings: '적금 납입',
+  allocation: '용도별 분배',
+  subscription: '구독',
+  insurance: '보험',
+  telecom: '통신',
+  utility: '공과금',
+  loan: '대출',
+  other: '기타'
+}

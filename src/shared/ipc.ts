@@ -1,4 +1,12 @@
-import type { AccountType, CardType, InterestType, TaxType } from './domain'
+import type {
+  AccountType,
+  CardType,
+  FlowCategory,
+  FlowCycle,
+  FlowKind,
+  InterestType,
+  TaxType
+} from './domain'
 
 // main ↔ renderer 사이에 오가는 요청과 결과. 실패는 항상 한국어 안내로 돌려준다.
 export interface DbStatus {
@@ -49,6 +57,8 @@ export interface Account extends Omit<AccountInput, 'savings'> {
   isActive: boolean
   sortOrder: number
   savings: SavingsInput | null
+  flowCount: number
+  monthlyContribution: number
 }
 
 export interface CardInput {
@@ -64,6 +74,33 @@ export interface Card extends CardInput {
   id: number
   isActive: boolean
   linkedAccount: { name: string; bank: string; isActive: boolean } | null
+  flowCount: number
+}
+
+export interface FlowInput {
+  name: string
+  kind: FlowKind
+  amount: number
+  isVariable: boolean
+  fromAccountId: number | null
+  toAccountId: number | null
+  cardId: number | null
+  category: FlowCategory
+  cycle: FlowCycle
+  day: number
+  month: number | null
+  startDate: string
+  endDate: string | null
+  memo: string | null
+}
+export interface Flow extends FlowInput {
+  id: number
+  status: 'scheduled' | 'active' | 'ended'
+  fromAccount: { name: string; bank: string; isActive: boolean } | null
+  toAccount: { name: string; bank: string; isActive: boolean } | null
+  card: { name: string; issuer: string; isActive: boolean } | null
+  overrideCount: number
+  sortOrder: number
 }
 
 export interface Api {
@@ -83,4 +120,14 @@ export interface Api {
   updateCard(id: number, input: CardInput): Promise<Result<Card>>
   closeCard(id: number): Promise<Result<void>>
   restoreCard(id: number): Promise<Result<void>>
+  listFlows(includeEnded?: boolean): Promise<Result<Flow[]>>
+  addFlow(input: FlowInput): Promise<Result<Flow>>
+  updateFlow(
+    id: number,
+    input: FlowInput,
+    effectiveStartDate?: string | null
+  ): Promise<Result<Flow>>
+  endFlow(id: number, endDate: string): Promise<Result<void>>
+  resumeFlow(id: number): Promise<Result<void>>
+  deleteFlow(id: number): Promise<Result<void>>
 }

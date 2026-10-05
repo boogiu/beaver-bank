@@ -287,7 +287,12 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
         <ConfirmModal
           title="카드 해지"
           message={
-            <>{closing.name}을(를) 해지하면 목록에서 숨겨집니다. 결제 카드 정보는 보존됩니다.</>
+            <>
+              {closing.name}을(를) 해지하면 목록에서 숨겨집니다. 결제 카드 정보는 보존됩니다.
+              {closing.flowCount > 0 && (
+                <> 관련 정기 결제 {closing.flowCount}개는 그대로 남습니다.</>
+              )}
+            </>
           }
           confirmLabel="해지"
           onClose={() => setClosing(null)}

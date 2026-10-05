@@ -15,6 +15,13 @@
       "when": 1791163244019,
       "tag": "0001_lucky_skreet",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791194774358,
+      "tag": "0002_mushy_thing",
+      "breakpoints": true
     }
   ]
 }

@@ -631,6 +631,60 @@ select:focus-visible,
   margin-top: 12px;
   color: var(--text);
 }
+.flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.flow-card {
+  overflow: hidden;
+}
+.flow-main,
+.flow-ident,
+.flow-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.flow-main {
+  justify-content: space-between;
+  gap: 16px;
+}
+.flow-ident {
+  flex: 1;
+  flex-wrap: wrap;
+}
+.flow-name {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: var(--size-md);
+}
+.flow-amount {
+  flex: 0 0 auto;
+  font-size: var(--size-md);
+  font-weight: 600;
+}
+.flow-meta {
+  flex-wrap: wrap;
+  margin-top: 12px;
+  color: var(--muted);
+}
+.flow-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.read-only-field {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--page);
+}
 .graph-head {
   flex: 0 0 auto;
   margin-bottom: 14px;

@@ -331,6 +331,9 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
                       )}
                       {account.savings && (
                         <div className="card-details">
+                          {account.monthlyContribution > 0 && (
+                            <span>월 납입 {money(account.monthlyContribution)}</span>
+                          )}
                           <span>연 {account.savings.interestRate}%</span>
                           <span>{account.savings.maturityDate}</span>
                           {account.savings.targetAmount !== null && (
@@ -379,6 +382,7 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
           message={
             <>
               {closing.name}을(를) 해지하면 목록에서 숨겨집니다. 계좌와 적금·예금 정보는 보존됩니다.
+              {closing.flowCount > 0 && <> 관련 흐름 {closing.flowCount}개는 그대로 남습니다.</>}
             </>
           }
           confirmLabel="해지"

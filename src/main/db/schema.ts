@@ -131,6 +131,7 @@ export const flows = sqliteTable(
     toAccountId: integer('to_account_id').references(() => accounts.id, {
       onDelete: 'restrict'
     }),
+    cardId: integer('card_id').references(() => cards.id, { onDelete: 'set null' }),
     category: text('category', { enum: FLOW_CATEGORIES }).notNull().default('other'),
     cycle: text('cycle', { enum: FLOW_CYCLES }).notNull().default('monthly'),
     day: integer('day').notNull(), // 1~31
@@ -158,6 +159,7 @@ export const flows = sqliteTable(
         or (${t.kind} = 'payment' and ${t.fromAccountId} is not null and ${t.toAccountId} is null)`
     ),
     check('flows_period_check', sql`${t.endDate} is null or ${t.endDate} >= ${t.startDate}`),
+    check('flows_card_check', sql`${t.kind} = 'payment' or ${t.cardId} is null`),
     check(
       'flows_start_date_check',
       sql`${t.startDate} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' and strftime('%Y-%m-%d', ${t.startDate}, '+0 days') is ${t.startDate} and ${t.startDate} > '0000-12-31'`
