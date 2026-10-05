@@ -1,0 +1,10 @@
+{
+  "candidate": "M1",
+  "method": "다",
+  "attempt": 1,
+  "file": "M1-C-sheet-a1-original.png",
+  "tool": "image_gen__imagegen",
+  "transparent_background": true,
+  "prompt": "Use case: illustration-story. Generate one transparent PNG asset sheet at 2048 by 2048 pixels. Exact 2-column by 3-row grid with equal rectangular cells, clear transparent gutters, no labels, no grid lines. Five distinct illustrations, each completely inside its cell, sixth cell blank. Reading order: top left menu mascot; top right empty accounts (beaver with an EMPTY open wooden savings box and one amber coin); middle left empty cards (beaver with a plain blank payment card with a generic chip); middle right empty purposes (beaver with three sorting jars and green leaf); bottom left empty graph (beaver with three small connected circles, no arrows); bottom right EMPTY transparent. All five depict the IDENTICAL friendly compact rounded beaver: same head-to-body proportions, rounded ears, one hair tuft, two black dot eyes, tiny white eye highlights, paired rectangular white incisors, same red smiling mouth, broad oval crosshatched flat tail on the left. ABSOLUTELY FLAT vector-like solid color fills. Body only #A66B3F, belly only #E8BB80, tail only #A66B3F, all outline/eye/nose ink #302018, teeth #FAFAF6, mouth #E57D74. Props use solid wood brown, water #67BCD1, leaf #65A463, coin #D9A23C. No shading, gradients, texture, grain, lighting effects, glints, shadows, 3D, soft rendering or color variation inside any region. Outline uniform within each illustration. IMPORTANT optical sizing: the top-left mascot will be displayed at 40x40; other four at 200x200. Make ONLY its outer contour 5 times thicker than the other four outer contours (about 20 source pixels vs 4 source pixels for the same cell size) so final displayed outline thickness is equal. Keep facial geometry and body identity exactly the same across all five. Clean anti-aliased edges, transparent outside every shape. All objects fully visible with ample padding. No text, letters, words, artist names, logos, trademarks or real financial marks.",
+  "inputImages": []
+}

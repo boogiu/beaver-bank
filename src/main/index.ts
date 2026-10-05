@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { closeDatabase, getDbStatus, openDatabase } from './db'
+import * as service from './db/service'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -11,7 +12,7 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 640,
     title: 'BeaverBank',
-    backgroundColor: '#1c1410',
+    backgroundColor: '#1E1E1E',
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -39,7 +40,36 @@ function createWindow(): void {
 }
 
 function registerIpc(): void {
-  ipcMain.handle('db:status', () => getDbStatus())
+  ipcMain.handle('db:status', () => service.attempt(getDbStatus))
+  ipcMain.handle('purpose:list', () => service.attempt(service.listPurposes))
+  ipcMain.handle('purpose:add', (_, input) => service.attempt(() => service.addPurpose(input)))
+  ipcMain.handle('purpose:update', (_, id, input) =>
+    service.attempt(() => service.updatePurpose(id, input))
+  )
+  ipcMain.handle('purpose:delete', (_, id) => service.attempt(() => service.deletePurpose(id)))
+  ipcMain.handle('purpose:reorder', (_, ids) => service.attempt(() => service.reorderPurposes(ids)))
+  ipcMain.handle('account:list', (_, includeInactive) =>
+    service.attempt(() => service.listAccounts(includeInactive))
+  )
+  ipcMain.handle('account:add', (_, input) => service.attempt(() => service.addAccount(input)))
+  ipcMain.handle('account:update', (_, id, input) =>
+    service.attempt(() => service.updateAccount(id, input))
+  )
+  ipcMain.handle('account:close', (_, id) =>
+    service.attempt(() => service.setAccountActive(id, false))
+  )
+  ipcMain.handle('account:restore', (_, id) =>
+    service.attempt(() => service.setAccountActive(id, true))
+  )
+  ipcMain.handle('card:list', (_, includeInactive) =>
+    service.attempt(() => service.listCards(includeInactive))
+  )
+  ipcMain.handle('card:add', (_, input) => service.attempt(() => service.addCard(input)))
+  ipcMain.handle('card:update', (_, id, input) =>
+    service.attempt(() => service.updateCard(id, input))
+  )
+  ipcMain.handle('card:close', (_, id) => service.attempt(() => service.setCardActive(id, false)))
+  ipcMain.handle('card:restore', (_, id) => service.attempt(() => service.setCardActive(id, true)))
 }
 
 app.whenReady().then(() => {

@@ -12,6 +12,7 @@ export type AppDatabase = BetterSQLite3Database<typeof schema>
 const TABLES = [
   'purposes',
   'accounts',
+  'cards',
   'savings_details',
   'flows',
   'flow_overrides',

@@ -1,0 +1,12 @@
+{
+  "candidate": "M1",
+  "method": "다",
+  "attempt": 2,
+  "file": "M1-C-sheet-a2-original.png",
+  "tool": "image_gen__imagegen",
+  "referenced_image_paths": [
+    "C:/Money/.skywork/paseo-orchestration/2026-10-05-step2-obsidian/spike/images/M1-C-sheet-a1-original.png"
+  ],
+  "transparent_background": true,
+  "prompt": "Revise this experiment's own transparent five-asset contact sheet. Preserve the exact 2-column 3-row layout, each cell's transparent gutters, first five assets and empty sixth cell. Preserve the compact rounded beaver identity, head/body ratio, tail silhouette, identical face and brown body/tan belly colors across all five. Two mandatory corrections: (1) ALL FILLS MUST BE ABSOLUTELY FLAT single constant colors. Remove every gradient, shading, light falloff, highlight, shadow and texture from body, belly, tail and props. Smooth flat vector-like fills with antialiased edges only. No recoloring inside a region. (2) Match apparent outline thickness for target display: top-left mascot40x40 versus other four200x200. Increase top-left mascot outer and facial outline to FIVE TIMES all others' source pixel thickness, while all four empty-state outlines stay equally thin. Exact same dark outline color #302018 everywhere; no variable darkness. Keep the five entire assets fully inside fixed equal cells, transparent background. No text, labels, artist names, artwork imitation, trademarks or real company logos. Save 2048 square if possible. This is one sheet to crop via script."
+}

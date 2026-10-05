@@ -11,6 +11,9 @@ export const ACCOUNT_TYPES = [
 ] as const
 export type AccountType = (typeof ACCOUNT_TYPES)[number]
 
+export const CARD_TYPES = ['debit', 'credit'] as const // 체크카드, 신용카드
+export type CardType = (typeof CARD_TYPES)[number]
+
 export const INTEREST_TYPES = ['simple', 'compound'] as const // 단리, 복리
 export type InterestType = (typeof INTEREST_TYPES)[number]
 

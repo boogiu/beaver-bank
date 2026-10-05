@@ -1,0 +1,761 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "69d34e20-bc89-4755-be1b-068701ce1c66",
+  "prevId": "e7a2c0a6-22c3-4f0d-ba03-e2dee4eeb701",
+  "tables": {
+    "accounts": {
+      "name": "accounts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "bank": {
+          "name": "bank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "number_tail": {
+          "name": "number_tail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purpose_id": {
+          "name": "purpose_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "memo": {
+          "name": "memo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CURRENT_TIMESTAMP)"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "accounts_purpose_id_purposes_id_fk": {
+          "name": "accounts_purpose_id_purposes_id_fk",
+          "tableFrom": "accounts",
+          "tableTo": "purposes",
+          "columnsFrom": [
+            "purpose_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "accounts_type_check": {
+          "name": "accounts_type_check",
+          "value": "\"accounts\".\"type\" in ('checking', 'installment', 'deposit', 'parking', 'cma', 'investment')"
+        }
+      }
+    },
+    "balance_snapshots": {
+      "name": "balance_snapshots",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "balance": {
+          "name": "balance",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "memo": {
+          "name": "memo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CURRENT_TIMESTAMP)"
+        }
+      },
+      "indexes": {
+        "balance_snapshots_account_date_idx": {
+          "name": "balance_snapshots_account_date_idx",
+          "columns": [
+            "account_id",
+            "date"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "balance_snapshots_account_id_accounts_id_fk": {
+          "name": "balance_snapshots_account_id_accounts_id_fk",
+          "tableFrom": "balance_snapshots",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "balance_snapshots_balance_check": {
+          "name": "balance_snapshots_balance_check",
+          "value": "typeof(\"balance_snapshots\".\"balance\") = 'integer'"
+        },
+        "balance_snapshots_date_check": {
+          "name": "balance_snapshots_date_check",
+          "value": "\"balance_snapshots\".\"date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' and strftime('%Y-%m-%d', \"balance_snapshots\".\"date\", '+0 days') is \"balance_snapshots\".\"date\" and \"balance_snapshots\".\"date\" > '0000-12-31'"
+        }
+      }
+    },
+    "cards": {
+      "name": "cards",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "issuer": {
+          "name": "issuer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "payment_day": {
+          "name": "payment_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "number_tail": {
+          "name": "number_tail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "memo": {
+          "name": "memo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CURRENT_TIMESTAMP)"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cards_account_id_accounts_id_fk": {
+          "name": "cards_account_id_accounts_id_fk",
+          "tableFrom": "cards",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "cards_type_check": {
+          "name": "cards_type_check",
+          "value": "\"cards\".\"type\" in ('debit', 'credit')"
+        },
+        "cards_payment_day_check": {
+          "name": "cards_payment_day_check",
+          "value": "(\"cards\".\"type\" = 'debit' and \"cards\".\"payment_day\" is null) or (\"cards\".\"type\" = 'credit' and typeof(\"cards\".\"payment_day\") = 'integer' and \"cards\".\"payment_day\" between 1 and 31)"
+        }
+      }
+    },
+    "flow_overrides": {
+      "name": "flow_overrides",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "flow_id": {
+          "name": "flow_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurrence_date": {
+          "name": "occurrence_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actual_amount": {
+          "name": "actual_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "skipped": {
+          "name": "skipped",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "memo": {
+          "name": "memo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "flow_overrides_flow_date_idx": {
+          "name": "flow_overrides_flow_date_idx",
+          "columns": [
+            "flow_id",
+            "occurrence_date"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "flow_overrides_flow_id_flows_id_fk": {
+          "name": "flow_overrides_flow_id_flows_id_fk",
+          "tableFrom": "flow_overrides",
+          "tableTo": "flows",
+          "columnsFrom": [
+            "flow_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "flow_overrides_effect_check": {
+          "name": "flow_overrides_effect_check",
+          "value": "\"flow_overrides\".\"skipped\" = 1 or \"flow_overrides\".\"actual_amount\" is not null"
+        },
+        "flow_overrides_amount_check": {
+          "name": "flow_overrides_amount_check",
+          "value": "\"flow_overrides\".\"actual_amount\" is null or (typeof(\"flow_overrides\".\"actual_amount\") = 'integer' and \"flow_overrides\".\"actual_amount\" >= 0)"
+        },
+        "flow_overrides_occurrence_date_check": {
+          "name": "flow_overrides_occurrence_date_check",
+          "value": "\"flow_overrides\".\"occurrence_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' and strftime('%Y-%m-%d', \"flow_overrides\".\"occurrence_date\", '+0 days') is \"flow_overrides\".\"occurrence_date\" and \"flow_overrides\".\"occurrence_date\" > '0000-12-31'"
+        }
+      }
+    },
+    "flows": {
+      "name": "flows",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount": {
+          "name": "amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_variable": {
+          "name": "is_variable",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "from_account_id": {
+          "name": "from_account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "to_account_id": {
+          "name": "to_account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'other'"
+        },
+        "cycle": {
+          "name": "cycle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'monthly'"
+        },
+        "day": {
+          "name": "day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "month": {
+          "name": "month",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "memo": {
+          "name": "memo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CURRENT_TIMESTAMP)"
+        }
+      },
+      "indexes": {
+        "flows_from_account_idx": {
+          "name": "flows_from_account_idx",
+          "columns": [
+            "from_account_id"
+          ],
+          "isUnique": false
+        },
+        "flows_to_account_idx": {
+          "name": "flows_to_account_idx",
+          "columns": [
+            "to_account_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "flows_from_account_id_accounts_id_fk": {
+          "name": "flows_from_account_id_accounts_id_fk",
+          "tableFrom": "flows",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "from_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "flows_to_account_id_accounts_id_fk": {
+          "name": "flows_to_account_id_accounts_id_fk",
+          "tableFrom": "flows",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "to_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "flows_kind_check": {
+          "name": "flows_kind_check",
+          "value": "\"flows\".\"kind\" in ('income', 'transfer', 'payment')"
+        },
+        "flows_category_check": {
+          "name": "flows_category_check",
+          "value": "\"flows\".\"category\" in ('salary', 'savings', 'allocation', 'subscription', 'insurance', 'telecom', 'utility', 'loan', 'other')"
+        },
+        "flows_cycle_check": {
+          "name": "flows_cycle_check",
+          "value": "\"flows\".\"cycle\" in ('monthly', 'yearly')"
+        },
+        "flows_amount_check": {
+          "name": "flows_amount_check",
+          "value": "typeof(\"flows\".\"amount\") = 'integer' and \"flows\".\"amount\" >= 0"
+        },
+        "flows_day_check": {
+          "name": "flows_day_check",
+          "value": "typeof(\"flows\".\"day\") = 'integer' and \"flows\".\"day\" between 1 and 31"
+        },
+        "flows_month_check": {
+          "name": "flows_month_check",
+          "value": "(\"flows\".\"cycle\" = 'monthly' and \"flows\".\"month\" is null) or (\"flows\".\"cycle\" = 'yearly' and \"flows\".\"month\" is not null and typeof(\"flows\".\"month\") = 'integer' and \"flows\".\"month\" between 1 and 12)"
+        },
+        "flows_accounts_check": {
+          "name": "flows_accounts_check",
+          "value": "(\"flows\".\"kind\" = 'income' and \"flows\".\"from_account_id\" is null and \"flows\".\"to_account_id\" is not null)\n        or (\"flows\".\"kind\" = 'transfer' and \"flows\".\"from_account_id\" is not null and \"flows\".\"to_account_id\" is not null and \"flows\".\"from_account_id\" <> \"flows\".\"to_account_id\")\n        or (\"flows\".\"kind\" = 'payment' and \"flows\".\"from_account_id\" is not null and \"flows\".\"to_account_id\" is null)"
+        },
+        "flows_period_check": {
+          "name": "flows_period_check",
+          "value": "\"flows\".\"end_date\" is null or \"flows\".\"end_date\" >= \"flows\".\"start_date\""
+        },
+        "flows_start_date_check": {
+          "name": "flows_start_date_check",
+          "value": "\"flows\".\"start_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' and strftime('%Y-%m-%d', \"flows\".\"start_date\", '+0 days') is \"flows\".\"start_date\" and \"flows\".\"start_date\" > '0000-12-31'"
+        },
+        "flows_end_date_check": {
+          "name": "flows_end_date_check",
+          "value": "\"flows\".\"end_date\" is null or (\"flows\".\"end_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' and strftime('%Y-%m-%d', \"flows\".\"end_date\", '+0 days') is \"flows\".\"end_date\" and \"flows\".\"end_date\" > '0000-12-31')"
+        }
+      }
+    },
+    "purposes": {
+      "name": "purposes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'#8b5e3c'"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CURRENT_TIMESTAMP)"
+        }
+      },
+      "indexes": {
+        "purposes_name_unique": {
+          "name": "purposes_name_unique",
+          "columns": [
+            "name"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "savings_details": {
+      "name": "savings_details",
+      "columns": {
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "maturity_date": {
+          "name": "maturity_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "interest_rate": {
+          "name": "interest_rate",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "interest_type": {
+          "name": "interest_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'simple'"
+        },
+        "tax_type": {
+          "name": "tax_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'normal'"
+        },
+        "target_amount": {
+          "name": "target_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "savings_details_account_id_accounts_id_fk": {
+          "name": "savings_details_account_id_accounts_id_fk",
+          "tableFrom": "savings_details",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "savings_interest_type_check": {
+          "name": "savings_interest_type_check",
+          "value": "\"savings_details\".\"interest_type\" in ('simple', 'compound')"
+        },
+        "savings_tax_type_check": {
+          "name": "savings_tax_type_check",
+          "value": "\"savings_details\".\"tax_type\" in ('normal', 'tax_free', 'preferential')"
+        },
+        "savings_period_check": {
+          "name": "savings_period_check",
+          "value": "\"savings_details\".\"maturity_date\" > \"savings_details\".\"start_date\""
+        },
+        "savings_rate_check": {
+          "name": "savings_rate_check",
+          "value": "\"savings_details\".\"interest_rate\" >= 0"
+        },
+        "savings_target_amount_check": {
+          "name": "savings_target_amount_check",
+          "value": "\"savings_details\".\"target_amount\" is null or (typeof(\"savings_details\".\"target_amount\") = 'integer' and \"savings_details\".\"target_amount\" >= 0)"
+        },
+        "savings_start_date_check": {
+          "name": "savings_start_date_check",
+          "value": "\"savings_details\".\"start_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' and strftime('%Y-%m-%d', \"savings_details\".\"start_date\", '+0 days') is \"savings_details\".\"start_date\" and \"savings_details\".\"start_date\" > '0000-12-31'"
+        },
+        "savings_maturity_date_check": {
+          "name": "savings_maturity_date_check",
+          "value": "\"savings_details\".\"maturity_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' and strftime('%Y-%m-%d', \"savings_details\".\"maturity_date\", '+0 days') is \"savings_details\".\"maturity_date\" and \"savings_details\".\"maturity_date\" > '0000-12-31'"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

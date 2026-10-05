@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm/sqlite-core'
 import {
   ACCOUNT_TYPES,
+  CARD_TYPES,
   FLOW_CATEGORIES,
   FLOW_CYCLES,
   FLOW_KINDS,
@@ -52,6 +53,30 @@ export const accounts = sqliteTable(
     ...timestamps
   },
   (t) => [check('accounts_type_check', sql`${t.type} in (${inList(ACCOUNT_TYPES)})`)]
+)
+
+// ②-1 결제 카드. 연결 계좌가 삭제돼도 카드 기록은 남는다.
+export const cards = sqliteTable(
+  'cards',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    issuer: text('issuer').notNull(),
+    type: text('type', { enum: CARD_TYPES }).notNull(),
+    accountId: integer('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    paymentDay: integer('payment_day'),
+    numberTail: text('number_tail'),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    memo: text('memo'),
+    ...timestamps
+  },
+  (t) => [
+    check('cards_type_check', sql`${t.type} in (${inList(CARD_TYPES)})`),
+    check(
+      'cards_payment_day_check',
+      sql`(${t.type} = 'debit' and ${t.paymentDay} is null) or (${t.type} = 'credit' and typeof(${t.paymentDay}) = 'integer' and ${t.paymentDay} between 1 and 31)`
+    )
+  ]
 )
 
 // ③ 적금·예금 전용 정보 (accounts와 1:1).
