@@ -1,3 +1,4 @@
+import { AmountInput } from '../components/AmountInput'
 import { useEffect, useState } from 'react'
 import { Pencil, RotateCcw, Ban } from 'lucide-react'
 import { ACCOUNT_TYPES, INTEREST_TYPES, TAX_TYPES } from '@shared/domain'
@@ -191,13 +192,11 @@ function AccountForm({
               />
             </Field>
             <Field name="targetAmount" label="목표액 (원)" error={error}>
-              <input
+              <AmountInput
                 value={amount}
-                inputMode="numeric"
-                className={error?.field === 'targetAmount' ? 'invalid' : ''}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, '')
-                  setAmount(digits ? Number(digits).toLocaleString('ko-KR') : '')
+                invalid={error?.field === 'targetAmount'}
+                onChange={(next) => {
+                  setAmount(next)
                   setError(null)
                 }}
               />

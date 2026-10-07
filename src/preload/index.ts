@@ -26,7 +26,9 @@ const api: Api = {
     ipcRenderer.invoke('flow:update', id, input, effectiveStartDate),
   endFlow: (id, endDate) => ipcRenderer.invoke('flow:end', id, endDate),
   resumeFlow: (id) => ipcRenderer.invoke('flow:resume', id),
-  deleteFlow: (id) => ipcRenderer.invoke('flow:delete', id)
+  deleteFlow: (id) => ipcRenderer.invoke('flow:delete', id),
+  listMonthlyFlows: (year, month) => ipcRenderer.invoke('flow:monthly', year, month),
+  saveFlowOverride: (input) => ipcRenderer.invoke('flow:override', input)
 }
 
 // contextIsolation이 켜져 있으면 contextBridge로 노출하고, 아니면 window에 직접 붙인다.

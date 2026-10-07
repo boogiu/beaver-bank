@@ -12,7 +12,7 @@ import FlowsPage from './pages/FlowsPage'
 
 export type PageId = string
 export type NavigationTarget = {
-  kind: 'account' | 'card' | 'purpose'
+  kind: 'account' | 'card' | 'purpose' | 'flow'
   id: number
   inactive: boolean
 }
@@ -70,7 +70,9 @@ function App(): React.JSX.Element {
       <main
         key={page}
         className={`page ${page === 'graph' ? 'graph-page' : ''}`}
-        onClick={() => target && setTarget(null)}
+        onPointerDown={() => {
+          if (target) setTarget(null)
+        }}
       >
         <Current target={target} clearTarget={() => setTarget(null)} navigate={navigate} />
       </main>

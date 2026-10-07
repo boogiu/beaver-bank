@@ -429,6 +429,8 @@ select:focus-visible,
 .modal-head h2 {
   margin: 0;
   font-size: var(--size-lg);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .modal-foot {
   justify-content: flex-end;
@@ -666,6 +668,83 @@ select:focus-visible,
   font-size: var(--size-md);
   font-weight: 600;
 }
+.view-switch {
+  display: inline-flex;
+  gap: 4px;
+}
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.month-nav h2 {
+  font-size: var(--size-lg);
+  margin: 0 12px;
+}
+.month-totals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.month-total {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.month-total strong {
+  font-size: var(--size-lg);
+  overflow-wrap: anywhere;
+}
+.month-empty {
+  text-align: center;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+.month-day h2 {
+  flex-wrap: wrap;
+}
+.occurrence-card {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  text-align: left;
+  color: var(--text);
+}
+.occurrence-card:hover {
+  border-color: var(--focus);
+}
+.occurrence-card .flow-meta {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+.badge.amber {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.badge.today {
+  border-color: var(--brown);
+  background: var(--brown);
+  color: var(--button-text);
+}
+.account-total {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.account-total strong {
+  margin-right: auto;
+}
+@media (max-width: 1050px) {
+  .month-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .flow-meta {
   flex-wrap: wrap;
   margin-top: 12px;
@@ -712,6 +791,10 @@ select:focus-visible,
   stroke: var(--muted);
   stroke-width: 1px;
 }
+.graph-node path {
+  stroke: var(--muted);
+  stroke-width: 1px;
+}
 .graph-node.inactive circle,
 .graph-node.inactive rect {
   stroke-dasharray: 3 2;
@@ -741,6 +824,8 @@ select:focus-visible,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 28px);
 }
 .graph-legend span {
   display: inline-flex;
@@ -765,6 +850,43 @@ select:focus-visible,
   width: 18px;
   height: 12px;
   border-radius: 4px;
+}
+.legend-shape.diamond {
+  width: 13px;
+  height: 13px;
+  transform: rotate(45deg);
+  background: var(--focus);
+}
+.legend-shape.triangle {
+  width: 0;
+  height: 0;
+  background: transparent;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 15px solid var(--amber);
+}
+.legend-line {
+  display: inline-block;
+  width: 19px;
+  height: 2px;
+  position: relative;
+}
+.legend-line.focus {
+  background: var(--focus);
+  color: var(--focus);
+}
+.legend-line.amber {
+  background: var(--amber);
+  color: var(--amber);
+}
+.legend-line::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  border-left: 7px solid currentColor;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
 }
 @media (max-width: 1050px) {
   .page {

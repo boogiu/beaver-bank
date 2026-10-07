@@ -35,37 +35,40 @@ export function Modal({
     field?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     field?.querySelector<HTMLElement>('input, textarea, button')?.focus()
   }, [error])
-  const onKeyDown = (event: React.KeyboardEvent): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-    }
-    if (
-      event.key === 'Enter' &&
-      !(event.target instanceof HTMLTextAreaElement) &&
-      !(event.target instanceof HTMLElement && event.target.closest('.custom-select'))
-    ) {
-      event.preventDefault()
-      onSubmit()
-    }
-    if (event.key === 'Tab') {
-      const focusable = [
-        ...(modal.current?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input:not(:disabled), textarea:not(:disabled)'
-        ) ?? [])
-      ]
-      if (!focusable.length) return
-      const first = focusable[0],
-        last = focusable[focusable.length - 1]
-      if (event.shiftKey && document.activeElement === first) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      if (dialogs[dialogs.length - 1] !== modal.current || event.isComposing) return
+      if (event.key === 'Escape') {
         event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
+        onClose()
+      }
+      if (event.key === 'Enter' && !(event.target instanceof HTMLTextAreaElement)) {
         event.preventDefault()
-        first.focus()
+        onSubmit()
+      }
+      if (event.key === 'Tab') {
+        const focusable = [
+          ...(modal.current?.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), textarea:not(:disabled)'
+          ) ?? [])
+        ]
+        if (!focusable.length) return
+        const first = focusable[0],
+          last = focusable[focusable.length - 1]
+        const outside = !modal.current?.contains(document.activeElement)
+        if (event.shiftKey && (outside || document.activeElement === first)) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && (outside || document.activeElement === last)) {
+          event.preventDefault()
+          first.focus()
+        }
       }
     }
-  }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => document.removeEventListener('keydown', onKeyDown, true)
+  }, [onClose, onSubmit])
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.stopPropagation()}>
       <div
@@ -74,7 +77,6 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        onKeyDown={onKeyDown}
       >
         <div className="modal-head">
           <h2>{title}</h2>

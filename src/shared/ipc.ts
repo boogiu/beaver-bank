@@ -103,6 +103,39 @@ export interface Flow extends FlowInput {
   sortOrder: number
 }
 
+export interface FlowOverrideInput {
+  flowId: number
+  occurrenceDate: string
+  action: 'original' | 'amount' | 'skip'
+  actualAmount: number | null
+  memo: string | null
+}
+export interface Occurrence {
+  flow: Flow
+  date: string
+  kind: FlowKind
+  sortOrder: number
+  originalAmount: number
+  amount: number
+  action: FlowOverrideInput['action']
+  actualAmount: number | null
+  memo: string | null
+  fromAccountId: number | null
+  toAccountId: number | null
+}
+export interface MonthlyFlows {
+  year: number
+  month: number
+  occurrences: Occurrence[]
+  totals: {
+    income: number
+    transfer: number
+    payment: number
+    remaining: number
+    accounts: { id: number; incoming: number; outgoing: number }[]
+  }
+}
+
 export interface Api {
   getDbStatus(): Promise<Result<DbStatus>>
   listPurposes(): Promise<Result<Purpose[]>>
@@ -130,4 +163,6 @@ export interface Api {
   endFlow(id: number, endDate: string): Promise<Result<void>>
   resumeFlow(id: number): Promise<Result<void>>
   deleteFlow(id: number): Promise<Result<void>>
+  listMonthlyFlows(year: number, month: number): Promise<Result<MonthlyFlows>>
+  saveFlowOverride(input: FlowOverrideInput): Promise<Result<void>>
 }

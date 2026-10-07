@@ -1,10 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Ban, Pencil, RotateCcw, Trash2 } from 'lucide-react'
-import type { Account, ApiError, Card, Flow, FlowInput, Purpose } from '@shared/ipc'
+import type {
+  Account,
+  ApiError,
+  Card,
+  Flow,
+  FlowInput,
+  MonthlyFlows,
+  Occurrence,
+  Purpose
+} from '@shared/ipc'
 import type { FlowCategory, FlowKind } from '@shared/domain'
+import type { PageProps } from '../App'
 import { AddButton, Button, EmptyState, Icon, Switch } from '../components/Ui'
 import { ConfirmModal, Field, Modal, Select } from '../components/Modal'
 import { FLOW_CATEGORY, FLOW_INFO, money } from '../components/domain-ui'
+import MonthlyFlowsView from './MonthlyFlowsView'
+import OccurrenceModal from './OccurrenceModal'
+import { AmountInput } from '../components/AmountInput'
 
 const categories: Record<FlowKind, FlowCategory[]> = {
   income: ['salary', 'other'],
@@ -172,24 +185,11 @@ function FlowForm({
           />
         </Field>
         <Field name="amount" label="금액 (원)" error={error}>
-          <input
+          <AmountInput
             value={amount}
-            inputMode="numeric"
-            className={error?.field === 'amount' ? 'invalid' : ''}
-            onChange={(e) => {
-              const event = e.nativeEvent as InputEvent
-              const keyboardDigit =
-                event.inputType === 'insertText' && /^\d$/.test(event.data ?? '')
-              const deleting = event.inputType?.startsWith('delete')
-              if (
-                !keyboardDigit &&
-                !deleting &&
-                !/^(?:\d+|\d{1,3}(?:,\d{3})+)?$/.test(e.target.value)
-              )
-                return
-              const raw = e.target.value.replaceAll(',', '')
-              if (!/^\d*$/.test(raw)) return
-              setAmount(raw.replace(/\B(?=(\d{3})+(?!\d))/g, ','))
+            invalid={error?.field === 'amount'}
+            onChange={(next) => {
+              setAmount(next)
               setError(null)
             }}
           />
@@ -359,7 +359,7 @@ function EndForm({
   )
 }
 
-export default function FlowsPage(): React.JSX.Element {
+export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX.Element {
   const [flows, setFlows] = useState<Flow[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [cards, setCards] = useState<Card[]>([])
@@ -369,6 +369,37 @@ export default function FlowsPage(): React.JSX.Element {
   const [ending, setEnding] = useState<Flow | null>(null)
   const [deleting, setDeleting] = useState<Flow | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<'monthly' | 'flows'>(
+    target?.kind === 'flow' ? 'flows' : 'monthly'
+  )
+  const [month, setMonth] = useState(() => ({
+    year: Number(today().slice(0, 4)),
+    month: Number(today().slice(5, 7))
+  }))
+  const [monthly, setMonthly] = useState<MonthlyFlows | null>(null)
+  const [occurrence, setOccurrence] = useState<Occurrence | null>(null)
+  const targetRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (view === 'flows' && target?.kind === 'flow' && flows.length) {
+      targetRef.current?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [view, target, flows])
+  useEffect(() => {
+    let active = true
+    void window.api.listMonthlyFlows(month.year, month.month).then((result) => {
+      if (!active) return
+      if (result.ok) setMonthly(result.data)
+      else setError(result.error.message)
+    })
+    return () => {
+      active = false
+    }
+  }, [month])
+  const refreshMonthly = async (): Promise<void> => {
+    const result = await window.api.listMonthlyFlows(month.year, month.month)
+    if (result.ok) setMonthly(result.data)
+    else setError(result.error.message)
+  }
   const refresh = async (): Promise<void> => {
     const [flowResult, accountResult, cardResult, purposeResult] = await Promise.all([
       window.api.listFlows(true),
@@ -384,6 +415,7 @@ export default function FlowsPage(): React.JSX.Element {
     else setError(cardResult.error.message)
     if (purposeResult.ok) setPurposes(purposeResult.data)
     else setError(purposeResult.error.message)
+    await refreshMonthly()
   }
   useEffect(() => {
     void Promise.all([
@@ -441,7 +473,29 @@ export default function FlowsPage(): React.JSX.Element {
           <p>반복되는 돈의 움직임을 관리합니다.</p>
         </div>
         <div className="page-actions">
-          <Switch label="종료한 흐름 보기" checked={showEnded} onChange={setShowEnded} />
+          <div className="view-switch" role="group" aria-label="흐름 보기 선택">
+            <Button
+              variant={view === 'monthly' ? 'primary' : undefined}
+              onClick={() => {
+                setView('monthly')
+                clearTarget()
+              }}
+            >
+              월별 보기
+            </Button>
+            <Button
+              variant={view === 'flows' ? 'primary' : undefined}
+              onClick={() => {
+                setView('flows')
+                clearTarget()
+              }}
+            >
+              흐름 보기
+            </Button>
+          </div>
+          {view === 'flows' && (
+            <Switch label="종료한 흐름 보기" checked={showEnded} onChange={setShowEnded} />
+          )}
           <AddButton
             disabled={!accounts.some((account) => account.isActive)}
             onClick={() => setEditing('add')}
@@ -451,7 +505,17 @@ export default function FlowsPage(): React.JSX.Element {
         </div>
       </header>
       {error && <p className="error-banner">{error}</p>}
-      {!accounts.some((account) => account.isActive) ? (
+      {view === 'monthly' ? (
+        <MonthlyFlowsView
+          month={month}
+          monthly={monthly}
+          flows={flows}
+          accounts={accounts}
+          onMonthChange={setMonth}
+          onAdd={() => setEditing('add')}
+          onOpen={setOccurrence}
+        />
+      ) : !accounts.some((account) => account.isActive) ? (
         <EmptyState
           kind="accounts"
           title="사용 중인 계좌가 없습니다"
@@ -477,7 +541,8 @@ export default function FlowsPage(): React.JSX.Element {
               <div className="flow-list">
                 {members.map((flow) => (
                   <article
-                    className={`item-card flow-card ${flow.status === 'ended' ? 'inactive' : ''}`}
+                    ref={target?.kind === 'flow' && target.id === flow.id ? targetRef : undefined}
+                    className={`item-card flow-card ${flow.status === 'ended' ? 'inactive' : ''} ${target?.kind === 'flow' && target.id === flow.id ? 'highlighted' : ''}`}
                     key={flow.id}
                   >
                     <div className="flow-main">
@@ -548,6 +613,16 @@ export default function FlowsPage(): React.JSX.Element {
         />
       )}
       {ending && <EndForm flow={ending} onClose={() => setEnding(null)} onSaved={saved} />}
+      {occurrence && (
+        <OccurrenceModal
+          occurrence={occurrence}
+          onClose={() => setOccurrence(null)}
+          onSaved={async () => {
+            await refresh()
+            setOccurrence(null)
+          }}
+        />
+      )}
       {deleting && (
         <ConfirmModal
           title="흐름 삭제"

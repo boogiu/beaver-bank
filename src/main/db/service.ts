@@ -1,5 +1,11 @@
-import { asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { ACCOUNT_TYPES, CARD_TYPES, INTEREST_TYPES, TAX_TYPES } from '../../shared/domain'
+import {
+  compareOccurrences,
+  isRealDate,
+  occurrenceDate,
+  sumOccurrences
+} from '../../shared/occurrences'
 import type {
   Account,
   AccountInput,
@@ -8,6 +14,9 @@ import type {
   CardInput,
   Flow,
   FlowInput,
+  FlowOverrideInput,
+  MonthlyFlows,
+  Occurrence,
   Purpose,
   PurposeInput,
   Result,
@@ -633,4 +642,99 @@ export function deleteFlow(id: number): void {
     tx.delete(flowOverrides).where(eq(flowOverrides.flowId, id)).run()
     tx.delete(flows).where(eq(flows.id, id)).run()
   })
+}
+
+export function listMonthlyFlows(year: number, month: number): MonthlyFlows {
+  if (!Number.isSafeInteger(year) || year < 1 || year > 9999)
+    invalid('year', '연도를 다시 확인해 주세요.')
+  if (!Number.isSafeInteger(month) || month < 1 || month > 12)
+    invalid('month', '월을 다시 확인해 주세요.')
+  const db = openDatabase()
+  const flowRows = listFlows(true)
+  const exceptions = new Map(
+    db
+      .select()
+      .from(flowOverrides)
+      .all()
+      .map((row) => [`${row.flowId}:${row.occurrenceDate}`, row])
+  )
+  const occurrences: Occurrence[] = []
+  for (const flow of flowRows) {
+    const date = occurrenceDate(flow, year, month)
+    if (!date) continue
+    const exception = exceptions.get(`${flow.id}:${date}`)
+    const action = exception ? (exception.skipped ? 'skip' : 'amount') : 'original'
+    occurrences.push({
+      flow,
+      date,
+      kind: flow.kind,
+      sortOrder: flow.sortOrder,
+      originalAmount: flow.amount,
+      amount: action === 'skip' ? 0 : (exception?.actualAmount ?? flow.amount),
+      action,
+      actualAmount: exception?.actualAmount ?? null,
+      memo: exception?.memo ?? null,
+      fromAccountId: flow.fromAccountId,
+      toAccountId: flow.toAccountId
+    })
+  }
+  occurrences.sort(compareOccurrences)
+  const totals = sumOccurrences(occurrences)
+  const purposeOrder = new Map(listPurposes().map((purpose) => [purpose.id, purpose.sortOrder]))
+  const accountOrder = new Map(
+    listAccounts(true)
+      .sort((a, b) => {
+        const rank = (account: Account): number =>
+          account.purposeId === null ? Infinity : (purposeOrder.get(account.purposeId) ?? Infinity)
+        return rank(a) - rank(b) || a.sortOrder - b.sortOrder || a.id - b.id
+      })
+      .map((account, index) => [account.id, index])
+  )
+  totals.accounts.sort(
+    (a, b) => (accountOrder.get(a.id) ?? Infinity) - (accountOrder.get(b.id) ?? Infinity)
+  )
+  return { year, month, occurrences, totals }
+}
+
+export function saveFlowOverride(input: FlowOverrideInput): void {
+  if (!input || typeof input !== 'object') invalid('flowId', '회차 정보를 다시 확인해 주세요.')
+  validId(input.flowId)
+  const db = openDatabase()
+  const flow = db.select().from(flows).where(eq(flows.id, input.flowId)).get()
+  if (!flow) return missing('flowId')
+  if (!isRealDate(input.occurrenceDate))
+    invalid('occurrenceDate', '회차 날짜를 YYYY-MM-DD로 입력해 주세요.')
+  const [year, month] = input.occurrenceDate.split('-').map(Number)
+  if (occurrenceDate(flow, year, month) !== input.occurrenceDate)
+    invalid('occurrenceDate', '이 흐름의 회차 날짜가 아닙니다.')
+  if (!['original', 'amount', 'skip'].includes(input.action))
+    invalid('action', '처리를 선택해 주세요.')
+  if (input.action === 'amount') {
+    if (!Number.isSafeInteger(input.actualAmount) || input.actualAmount! < 0)
+      invalid('actualAmount', '이번 회차 금액은 0원 이상의 정수로 입력해 주세요.')
+  } else if (input.actualAmount !== null)
+    invalid('actualAmount', '이 처리에는 금액을 넣을 수 없습니다.')
+  if (input.action === 'original') {
+    if (input.memo !== null) invalid('memo', '원래대로 처리에는 메모를 넣을 수 없습니다.')
+  } else if (input.memo !== null && (typeof input.memo !== 'string' || input.memo.length > 200))
+    invalid('memo', '메모는 200자 이하로 입력해 주세요.')
+  const key = and(
+    eq(flowOverrides.flowId, input.flowId),
+    eq(flowOverrides.occurrenceDate, input.occurrenceDate)
+  )
+  if (input.action === 'original') {
+    db.delete(flowOverrides).where(key).run()
+    return
+  }
+  const values = {
+    actualAmount: input.action === 'amount' ? input.actualAmount : null,
+    skipped: input.action === 'skip',
+    memo: input.memo
+  }
+  const existing = db.select({ id: flowOverrides.id }).from(flowOverrides).where(key).get()
+  if (existing) db.update(flowOverrides).set(values).where(eq(flowOverrides.id, existing.id)).run()
+  else
+    db.insert(flowOverrides)
+      .values({ flowId: input.flowId, occurrenceDate: input.occurrenceDate, ...values })
+      .run()
 }

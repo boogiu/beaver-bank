@@ -82,6 +82,12 @@ function registerIpc(): void {
   )
   ipcMain.handle('flow:resume', (_, id) => service.attempt(() => service.resumeFlow(id)))
   ipcMain.handle('flow:delete', (_, id) => service.attempt(() => service.deleteFlow(id)))
+  ipcMain.handle('flow:monthly', (_, year, month) =>
+    service.attempt(() => service.listMonthlyFlows(year, month))
+  )
+  ipcMain.handle('flow:override', (_, input) =>
+    service.attempt(() => service.saveFlowOverride(input))
+  )
 }
 
 app.whenReady().then(() => {
