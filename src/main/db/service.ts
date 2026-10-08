@@ -7,6 +7,11 @@ import {
   sumOccurrences
 } from '../../shared/occurrences'
 import type {
+  AccountBalance,
+  BalanceBefore,
+  BalanceHistory,
+  BalanceSnapshotInput,
+  PurposeAmount,
   Account,
   AccountInput,
   ApiError,
@@ -22,8 +27,39 @@ import type {
   Result,
   SavingsInput
 } from '../../shared/ipc'
-import { openDatabase } from './index'
-import { accounts, cards, flowOverrides, flows, purposes, savingsDetails } from './schema'
+import { openDatabase as openUserDatabase, type AppDatabase } from './index'
+import {
+  accounts,
+  balanceSnapshots,
+  cards,
+  flowOverrides,
+  flows,
+  purposes,
+  savingsDetails
+} from './schema'
+import {
+  balanceBefore,
+  calculateBalance,
+  calculatePurposeAmounts,
+  countDateOccurrences,
+  monthEnd,
+  todayDate,
+  type BalanceData
+} from '../../shared/balances'
+
+let suppliedDatabase: AppDatabase | null = null
+const openDatabase = (): AppDatabase => suppliedDatabase ?? openUserDatabase()
+
+// 동기 서비스 검증에서만 연결을 주입한다. 기본 사용자 DB 초기화를 호출하지 않는다.
+export function withDatabase<T>(database: AppDatabase, work: () => T): T {
+  const previous = suppliedDatabase
+  suppliedDatabase = database
+  try {
+    return work()
+  } finally {
+    suppliedDatabase = previous
+  }
+}
 
 class ServiceError extends Error {
   constructor(
@@ -651,12 +687,9 @@ export function listMonthlyFlows(year: number, month: number): MonthlyFlows {
     invalid('month', '월을 다시 확인해 주세요.')
   const db = openDatabase()
   const flowRows = listFlows(true)
+  const overrideRows = db.select().from(flowOverrides).all()
   const exceptions = new Map(
-    db
-      .select()
-      .from(flowOverrides)
-      .all()
-      .map((row) => [`${row.flowId}:${row.occurrenceDate}`, row])
+    overrideRows.map((row) => [`${row.flowId}:${row.occurrenceDate}`, row])
   )
   const occurrences: Occurrence[] = []
   for (const flow of flowRows) {
@@ -693,7 +726,128 @@ export function listMonthlyFlows(year: number, month: number): MonthlyFlows {
   totals.accounts.sort(
     (a, b) => (accountOrder.get(a.id) ?? Infinity) - (accountOrder.get(b.id) ?? Infinity)
   )
-  return { year, month, occurrences, totals }
+  const data: BalanceData = {
+    flows: flowRows,
+    overrides: overrideRows,
+    snapshots: db.select().from(balanceSnapshots).all()
+  }
+  const date = monthEnd(year, month)
+  const now = todayDate()
+  const accountTotals = totals.accounts.map((total) => {
+    const balance = calculateBalance(total.id, date, data, now)
+    return { ...total, balance: balance.balance, predicted: balance.predicted }
+  })
+  return { year, month, occurrences, totals: { ...totals, accounts: accountTotals } }
+}
+
+const queryDate = (date: string | undefined): string => {
+  const value = date === undefined ? todayDate() : date
+  if (!isRealDate(value)) invalid('date', '실제 날짜를 YYYY-MM-DD로 입력해 주세요.')
+  return value
+}
+const correctionDate = (date: string): string => {
+  if (typeof date !== 'string') invalid('date', '보정 날짜를 YYYY-MM-DD로 입력해 주세요.')
+  const value = queryDate(date)
+  if (value > todayDate()) invalid('date', '보정 날짜는 오늘이거나 이전 날짜여야 합니다.')
+  return value
+}
+const balanceAccount = (accountId: number, active = false): void => {
+  if (!Number.isSafeInteger(accountId) || accountId < 1)
+    invalid('accountId', '올바른 계좌를 선택해 주세요.')
+  const account = openDatabase().select().from(accounts).where(eq(accounts.id, accountId)).get()
+  if (!account) return missing('accountId')
+  if (active && !account.isActive)
+    invalid('accountId', '해지 계좌의 보정은 저장하거나 삭제할 수 없습니다.')
+}
+const readBalanceData = (): BalanceData => {
+  const db = openDatabase()
+  return {
+    snapshots: db.select().from(balanceSnapshots).all(),
+    flows: db.select().from(flows).all(),
+    overrides: db.select().from(flowOverrides).all()
+  }
+}
+export function listBalances(date?: string): AccountBalance[] {
+  const value = queryDate(date)
+  const db = openDatabase()
+  const data = readBalanceData()
+  const now = todayDate()
+  return db
+    .select()
+    .from(accounts)
+    .orderBy(asc(accounts.sortOrder), asc(accounts.id))
+    .all()
+    .map((account) => calculateBalance(account.id, value, data, now))
+}
+export function listPurposeAmounts(date?: string): PurposeAmount[] {
+  const value = queryDate(date)
+  const db = openDatabase()
+  const data = readBalanceData()
+  const accountRows = db.select().from(accounts).all()
+  const now = todayDate()
+  return calculatePurposeAmounts(
+    db
+      .select()
+      .from(purposes)
+      .orderBy(asc(purposes.sortOrder))
+      .all()
+      .map((row) => row.id),
+    accountRows,
+    accountRows.map((row) => calculateBalance(row.id, value, data, now))
+  )
+}
+export function listBalanceSnapshots(accountId: number): BalanceHistory[] {
+  balanceAccount(accountId)
+  const data = readBalanceData()
+  return data.snapshots
+    .filter((row) => row.accountId === accountId)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((row) => {
+      const beforeBalance = balanceBefore(accountId, row.date, data)
+      return {
+        ...row,
+        beforeBalance,
+        difference: beforeBalance === null ? null : row.balance - beforeBalance
+      }
+    })
+}
+export function getBalanceBefore(accountId: number, date: string): BalanceBefore {
+  balanceAccount(accountId)
+  correctionDate(date)
+  const data = readBalanceData()
+  return {
+    beforeBalance: balanceBefore(accountId, date, data),
+    occurrenceCount: countDateOccurrences(accountId, date, data),
+    existing: data.snapshots.find((row) => row.accountId === accountId && row.date === date) ?? null
+  }
+}
+export function saveBalanceSnapshot(input: BalanceSnapshotInput): void {
+  if (!input || typeof input !== 'object') invalid('balance', '보정 정보를 입력해 주세요.')
+  balanceAccount(input.accountId, true)
+  if (typeof input.date !== 'string') invalid('date', '보정 날짜를 YYYY-MM-DD로 입력해 주세요.')
+  correctionDate(input.date)
+  if (!Number.isSafeInteger(input.balance))
+    invalid('balance', '실제 잔액은 원 단위 정수로 입력해 주세요.')
+  const memo = optional(input.memo, 'memo', 200)
+  const db = openDatabase()
+  const key = and(
+    eq(balanceSnapshots.accountId, input.accountId),
+    eq(balanceSnapshots.date, input.date)
+  )
+  const existing = db.select({ id: balanceSnapshots.id }).from(balanceSnapshots).where(key).get()
+  if (existing) db.update(balanceSnapshots).set({ balance: input.balance, memo }).where(key).run()
+  else
+    db.insert(balanceSnapshots)
+      .values({ accountId: input.accountId, date: input.date, balance: input.balance, memo })
+      .run()
+}
+export function deleteBalanceSnapshot(id: number): void {
+  validId(id)
+  const db = openDatabase()
+  const row = db.select().from(balanceSnapshots).where(eq(balanceSnapshots.id, id)).get()
+  if (!row) return missing('id')
+  balanceAccount(row.accountId, true)
+  db.delete(balanceSnapshots).where(eq(balanceSnapshots.id, id)).run()
 }
 
 export function saveFlowOverride(input: FlowOverrideInput): void {

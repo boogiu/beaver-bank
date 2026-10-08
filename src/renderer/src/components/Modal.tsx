@@ -24,10 +24,14 @@ export function Modal({
 }): React.JSX.Element {
   const modal = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const first = modal.current?.querySelector<HTMLElement>(
       'input, textarea, .custom-select-button, button:not(.close-button)'
     )
     first?.focus()
+    return () => {
+      if (previous?.isConnected) previous.focus()
+    }
   }, [])
   useEffect(() => {
     if (!error?.field) return
@@ -45,6 +49,7 @@ export function Modal({
       }
       if (event.key === 'Enter' && !(event.target instanceof HTMLTextAreaElement)) {
         event.preventDefault()
+        if (event.target instanceof Element && event.target.closest('[data-enter-inert]')) return
         onSubmit()
       }
       if (event.key === 'Tab') {

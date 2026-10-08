@@ -1,6 +1,8 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Plus } from 'lucide-react'
+import type { PurposeAmount } from '@shared/ipc'
+import { money } from './domain-ui'
 import accountsImage from '../assets/illustrations/M1-C-accounts-a2.png'
 import cardsImage from '../assets/illustrations/M1-C-cards-a2.png'
 import purposesImage from '../assets/illustrations/M1-C-purposes-a2.png'
@@ -64,6 +66,22 @@ export function Switch({
       <span className="switch-track" />
       {label}
     </label>
+  )
+}
+
+export function PurposeAmountLabel({ value }: { value?: PurposeAmount }): React.JSX.Element | null {
+  if (!value) return null
+  return (
+    <span className="purpose-amount">
+      {value.amount === null ? (
+        <span className="muted">잔액 미입력</span>
+      ) : (
+        <>
+          <span className={value.amount < 0 ? 'negative' : ''}>{money(value.amount)}</span>
+          {value.missingCount > 0 && <span className="muted">미입력 {value.missingCount}개</span>}
+        </>
+      )}
+    </span>
   )
 }
 

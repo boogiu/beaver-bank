@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
-import type { ApiError, Purpose } from '@shared/ipc'
+import type { ApiError, Purpose, PurposeAmount } from '@shared/ipc'
 import type { PageProps } from '../App'
-import { AddButton, Button, EmptyState, Icon } from '../components/Ui'
+import { AddButton, Button, EmptyState, Icon, PurposeAmountLabel } from '../components/Ui'
 import { ConfirmModal, Field, Modal } from '../components/Modal'
 
 const PALETTE = [
@@ -83,21 +83,24 @@ function PurposeForm({
 
 export default function PurposesPage({ target }: PageProps): React.JSX.Element {
   const [items, setItems] = useState<Purpose[]>([])
+  const [amounts, setAmounts] = useState<PurposeAmount[]>([])
   const [editing, setEditing] = useState<Purpose | null | 'add'>(null)
   const [removing, setRemoving] = useState<Purpose | null>(null)
   const [error, setError] = useState<string | null>(null)
   const dragged = useRef<number | null>(null)
-  const refresh = async (): Promise<void> => {
-    const result = await window.api.listPurposes()
+  const refresh = useCallback(async (): Promise<void> => {
+    const [result, amountResult] = await Promise.all([
+      window.api.listPurposes(),
+      window.api.listPurposeAmounts()
+    ])
     if (result.ok) setItems(result.data)
     else setError(result.error.message)
-  }
-  useEffect(() => {
-    void window.api.listPurposes().then((result) => {
-      if (result.ok) setItems(result.data)
-      else setError(result.error.message)
-    })
+    if (amountResult.ok) setAmounts(amountResult.data)
+    else setError(amountResult.error.message)
   }, [])
+  useEffect(() => {
+    void Promise.resolve().then(refresh)
+  }, [refresh])
   useEffect(() => {
     if (target?.kind !== 'purpose') return
     document.getElementById(`purpose-${target.id}`)?.scrollIntoView({ block: 'center' })
@@ -122,7 +125,7 @@ export default function PurposesPage({ target }: PageProps): React.JSX.Element {
     if (!result.ok) {
       setError(result.error.message)
       void refresh()
-    }
+    } else void refresh()
   }
   return (
     <>
@@ -165,6 +168,7 @@ export default function PurposesPage({ target }: PageProps): React.JSX.Element {
               <Icon icon={GripVertical} size={16} />
               <span className="color-dot" style={{ backgroundColor: item.color }} />
               <span className="purpose-name">{item.name}</span>
+              <PurposeAmountLabel value={amounts.find((row) => row.purposeId === item.id)} />
               <Button
                 icon={Pencil}
                 aria-label={`${item.name} 수정`}

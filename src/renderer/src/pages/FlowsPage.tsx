@@ -377,6 +377,7 @@ export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX
     month: Number(today().slice(5, 7))
   }))
   const [monthly, setMonthly] = useState<MonthlyFlows | null>(null)
+  const [monthlyRevision, setMonthlyRevision] = useState(0)
   const [occurrence, setOccurrence] = useState<Occurrence | null>(null)
   const targetRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -394,12 +395,7 @@ export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX
     return () => {
       active = false
     }
-  }, [month])
-  const refreshMonthly = async (): Promise<void> => {
-    const result = await window.api.listMonthlyFlows(month.year, month.month)
-    if (result.ok) setMonthly(result.data)
-    else setError(result.error.message)
-  }
+  }, [month, monthlyRevision])
   const refresh = async (): Promise<void> => {
     const [flowResult, accountResult, cardResult, purposeResult] = await Promise.all([
       window.api.listFlows(true),
@@ -415,7 +411,7 @@ export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX
     else setError(cardResult.error.message)
     if (purposeResult.ok) setPurposes(purposeResult.data)
     else setError(purposeResult.error.message)
-    await refreshMonthly()
+    setMonthlyRevision((value) => value + 1)
   }
   useEffect(() => {
     void Promise.all([

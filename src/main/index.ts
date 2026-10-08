@@ -40,6 +40,22 @@ function createWindow(): void {
 }
 
 function registerIpc(): void {
+  ipcMain.handle('balance:list', (_, date) => service.attempt(() => service.listBalances(date)))
+  ipcMain.handle('balance:purposes', (_, date) =>
+    service.attempt(() => service.listPurposeAmounts(date))
+  )
+  ipcMain.handle('balance:history', (_, accountId) =>
+    service.attempt(() => service.listBalanceSnapshots(accountId))
+  )
+  ipcMain.handle('balance:save', (_, input) =>
+    service.attempt(() => service.saveBalanceSnapshot(input))
+  )
+  ipcMain.handle('balance:delete', (_, id) =>
+    service.attempt(() => service.deleteBalanceSnapshot(id))
+  )
+  ipcMain.handle('balance:before', (_, accountId, date) =>
+    service.attempt(() => service.getBalanceBefore(accountId, date))
+  )
   ipcMain.handle('db:status', () => service.attempt(getDbStatus))
   ipcMain.handle('purpose:list', () => service.attempt(service.listPurposes))
   ipcMain.handle('purpose:add', (_, input) => service.attempt(() => service.addPurpose(input)))

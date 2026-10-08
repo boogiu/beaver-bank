@@ -4,6 +4,12 @@ import type { Api } from '../shared/ipc'
 
 // renderer에서 window.api로 쓰는 main 프로세스 기능
 const api: Api = {
+  listBalances: (date) => ipcRenderer.invoke('balance:list', date),
+  listPurposeAmounts: (date) => ipcRenderer.invoke('balance:purposes', date),
+  listBalanceSnapshots: (accountId) => ipcRenderer.invoke('balance:history', accountId),
+  saveBalanceSnapshot: (input) => ipcRenderer.invoke('balance:save', input),
+  deleteBalanceSnapshot: (id) => ipcRenderer.invoke('balance:delete', id),
+  getBalanceBefore: (accountId, date) => ipcRenderer.invoke('balance:before', accountId, date),
   getDbStatus: () => ipcRenderer.invoke('db:status'),
   listPurposes: () => ipcRenderer.invoke('purpose:list'),
   addPurpose: (input) => ipcRenderer.invoke('purpose:add', input),

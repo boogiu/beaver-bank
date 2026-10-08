@@ -168,6 +168,19 @@ export default function MonthlyFlowsView({
                       </strong>
                       <span>들어오는 돈 {money(total.incoming)}</span>
                       <span>나가는 돈 {money(total.outgoing)}</span>
+                      <span className="month-end-balance">
+                        {total.balance === null ? (
+                          <span className="muted">잔액 미입력</span>
+                        ) : (
+                          <>
+                            월말 잔액{' '}
+                            <span className={total.balance < 0 ? 'negative' : ''}>
+                              {money(total.balance)}
+                            </span>
+                            {total.predicted && <span className="badge">예상</span>}
+                          </>
+                        )}
+                      </span>
                     </div>
                   )
                 })}

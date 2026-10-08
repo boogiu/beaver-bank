@@ -290,9 +290,51 @@ select:focus-visible,
   margin-bottom: 12px;
 }
 .card-actions {
+  flex-wrap: wrap;
   display: flex;
   gap: 7px;
   margin-top: 18px;
+}
+.muted,
+.balance-base {
+  color: var(--muted);
+}
+.negative {
+  color: var(--amber);
+}
+.card-balance {
+  margin: 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.balance-value,
+.purpose-amount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.balance-value strong {
+  font-size: var(--size-lg);
+  font-variant-numeric: tabular-nums;
+}
+.balance-base {
+  font-size: var(--size-xs);
+}
+.section > h2 {
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.purpose-heading-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.section > h2 .purpose-amount {
+  font-size: var(--size-md);
+  font-weight: 400;
 }
 .badge {
   display: inline-flex;
@@ -446,6 +488,52 @@ select:focus-visible,
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px 16px;
 }
+.balance-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+.balance-preview p {
+  margin: 8px 0;
+}
+.balance-history h3 {
+  margin: 20px 0 8px;
+  font-size: var(--size-md);
+}
+.balance-history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.history-balance,
+.history-difference {
+  text-align: right;
+  min-width: 0;
+}
+.history-memo,
+.history-actions {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.month-end-balance {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.history-memo {
+  white-space: pre-wrap;
+}
+.history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
 .field {
   display: flex;
   flex-direction: column;
@@ -568,6 +656,7 @@ select:focus-visible,
 }
 .purpose-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -579,7 +668,7 @@ select:focus-visible,
   opacity: 0.5;
 }
 .purpose-name {
-  flex: 1;
+  flex: 1 1 120px;
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: var(--size-md);

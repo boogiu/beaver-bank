@@ -132,11 +132,56 @@ export interface MonthlyFlows {
     transfer: number
     payment: number
     remaining: number
-    accounts: { id: number; incoming: number; outgoing: number }[]
+    accounts: {
+      id: number
+      incoming: number
+      outgoing: number
+      balance: number | null
+      predicted: boolean
+    }[]
   }
 }
 
+export interface AccountBalance {
+  accountId: number
+  date: string
+  balance: number | null
+  baseDate: string | null
+  baseBalance: number | null
+  predicted: boolean
+}
+export interface PurposeAmount {
+  purposeId: number | null
+  amount: number | null
+  accountCount: number
+  missingCount: number
+}
+export interface BalanceSnapshotInput {
+  accountId: number
+  date: string
+  balance: number
+  memo: string | null
+}
+export interface BalanceSnapshot extends BalanceSnapshotInput {
+  id: number
+}
+export interface BalanceHistory extends BalanceSnapshot {
+  beforeBalance: number | null
+  difference: number | null
+}
+export interface BalanceBefore {
+  beforeBalance: number | null
+  occurrenceCount: number
+  existing: BalanceSnapshot | null
+}
+
 export interface Api {
+  listBalances(date?: string): Promise<Result<AccountBalance[]>>
+  listPurposeAmounts(date?: string): Promise<Result<PurposeAmount[]>>
+  listBalanceSnapshots(accountId: number): Promise<Result<BalanceHistory[]>>
+  saveBalanceSnapshot(input: BalanceSnapshotInput): Promise<Result<void>>
+  deleteBalanceSnapshot(id: number): Promise<Result<void>>
+  getBalanceBefore(accountId: number, date: string): Promise<Result<BalanceBefore>>
   getDbStatus(): Promise<Result<DbStatus>>
   listPurposes(): Promise<Result<Purpose[]>>
   addPurpose(input: PurposeInput): Promise<Result<Purpose>>

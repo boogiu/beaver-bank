@@ -1,12 +1,20 @@
 import { AmountInput } from '../components/AmountInput'
-import { useEffect, useState } from 'react'
-import { Pencil, RotateCcw, Ban } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Pencil, RotateCcw, Ban, SlidersHorizontal } from 'lucide-react'
 import { ACCOUNT_TYPES, INTEREST_TYPES, TAX_TYPES } from '@shared/domain'
-import type { Account, AccountInput, ApiError, Purpose } from '@shared/ipc'
+import type {
+  Account,
+  AccountBalance,
+  AccountInput,
+  ApiError,
+  Purpose,
+  PurposeAmount
+} from '@shared/ipc'
 import type { PageProps } from '../App'
-import { AddButton, Button, EmptyState, Icon, Switch } from '../components/Ui'
+import { AddButton, Button, EmptyState, Icon, PurposeAmountLabel, Switch } from '../components/Ui'
 import { ConfirmModal, Field, Modal, Select } from '../components/Modal'
 import { ACCOUNT_INFO, money } from '../components/domain-ui'
+import BalanceModal from './BalanceModal'
 
 const blank: AccountInput = {
   name: '',
@@ -221,30 +229,32 @@ function AccountForm({
 export default function AccountsPage({ target }: PageProps): React.JSX.Element {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [purposes, setPurposes] = useState<Purpose[]>([])
+  const [balances, setBalances] = useState<AccountBalance[]>([])
+  const [amounts, setAmounts] = useState<PurposeAmount[]>([])
+  const [balancing, setBalancing] = useState<Account | null>(null)
   const [showInactive, setShowInactive] = useState(target?.kind === 'account' && target.inactive)
   const [editing, setEditing] = useState<Account | null | 'add'>(null)
   const [closing, setClosing] = useState<Account | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const refresh = async (): Promise<void> => {
-    const [accountResult, purposeResult] = await Promise.all([
+  const refresh = useCallback(async (): Promise<void> => {
+    const [accountResult, purposeResult, balanceResult, amountResult] = await Promise.all([
       window.api.listAccounts(true),
-      window.api.listPurposes()
+      window.api.listPurposes(),
+      window.api.listBalances(),
+      window.api.listPurposeAmounts()
     ])
     if (accountResult.ok) setAccounts(accountResult.data)
     else setError(accountResult.error.message)
     if (purposeResult.ok) setPurposes(purposeResult.data)
     else setError(purposeResult.error.message)
-  }
-  useEffect(() => {
-    void Promise.all([window.api.listAccounts(true), window.api.listPurposes()]).then(
-      ([accountResult, purposeResult]) => {
-        if (accountResult.ok) setAccounts(accountResult.data)
-        else setError(accountResult.error.message)
-        if (purposeResult.ok) setPurposes(purposeResult.data)
-        else setError(purposeResult.error.message)
-      }
-    )
+    if (balanceResult.ok) setBalances(balanceResult.data)
+    else setError(balanceResult.error.message)
+    if (amountResult.ok) setAmounts(amountResult.data)
+    else setError(amountResult.error.message)
   }, [])
+  useEffect(() => {
+    void Promise.resolve().then(refresh)
+  }, [refresh])
   useEffect(() => {
     if (target?.kind === 'account')
       document.getElementById(`account-${target.id}`)?.scrollIntoView({ block: 'center' })
@@ -297,11 +307,13 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
                 {group.color && (
                   <span className="color-dot" style={{ backgroundColor: group.color }} />
                 )}
-                {group.label}
+                <span className="purpose-heading-name">{group.label}</span>
+                <PurposeAmountLabel value={amounts.find((row) => row.purposeId === group.id)} />
               </h2>
               <div className="card-grid">
                 {members.map((account) => {
                   const info = ACCOUNT_INFO[account.type]
+                  const balance = balances.find((row) => row.accountId === account.id)
                   return (
                     <article
                       id={`account-${account.id}`}
@@ -322,6 +334,23 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
                         {account.bank}
                         {account.numberTail && ` · ${account.numberTail}`}
                       </div>
+                      {balance && (
+                        <div className="card-balance">
+                          {balance.balance === null ? (
+                            <span className="muted">잔액 미입력</span>
+                          ) : (
+                            <>
+                              <div className="balance-value">
+                                <span>잔액</span>
+                                <strong className={balance.balance < 0 ? 'negative' : ''}>
+                                  {money(balance.balance)}
+                                </strong>
+                              </div>
+                              <span className="balance-base">{balance.baseDate} 보정 기준</span>
+                            </>
+                          )}
+                        </div>
+                      )}
                       {group.color && (
                         <div className="card-purpose">
                           <span className="color-dot" style={{ backgroundColor: group.color }} />
@@ -349,6 +378,9 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
                             <Button icon={Ban} onClick={() => setClosing(account)}>
                               해지
                             </Button>
+                            <Button icon={SlidersHorizontal} onClick={() => setBalancing(account)}>
+                              {balance?.balance == null ? '잔액 입력' : '잔액 보정'}
+                            </Button>
                           </>
                         ) : (
                           <Button icon={RotateCcw} onClick={() => restore(account.id)}>
@@ -373,6 +405,16 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
             setEditing(null)
             void refresh()
           }}
+        />
+      )}
+      {balancing && (
+        <BalanceModal
+          account={balancing}
+          onClose={() => setBalancing(null)}
+          onChanged={() => {
+            void refresh()
+          }}
+          onSaved={() => setBalancing(null)}
         />
       )}
       {closing && (
