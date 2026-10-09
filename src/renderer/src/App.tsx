@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CreditCard, GitBranch, Info, Landmark, Tags, Repeat } from 'lucide-react'
+import { CreditCard, GitBranch, Info, Landmark, Tags, Repeat, LayoutDashboard } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import mascot from './assets/illustrations/M1-C-mascot-a2.png'
 import { Icon } from './components/Ui'
@@ -9,6 +9,7 @@ import PurposesPage from './pages/PurposesPage'
 import GraphPage from './pages/GraphPage'
 import InfoPage from './pages/InfoPage'
 import FlowsPage from './pages/FlowsPage'
+import DashboardPage from './pages/DashboardPage'
 
 export type PageId = string
 export type NavigationTarget = {
@@ -29,6 +30,7 @@ const MENU: {
   icon: LucideIcon
   component: React.ComponentType<PageProps>
 }[] = [
+  { id: 'dashboard', label: '대시보드', icon: LayoutDashboard, component: DashboardPage },
   { id: 'accounts', label: '계좌', icon: Landmark, component: AccountsPage },
   { id: 'cards', label: '카드', icon: CreditCard, component: CardsPage },
   { id: 'purposes', label: '용도', icon: Tags, component: PurposesPage },
@@ -38,7 +40,7 @@ const MENU: {
 ]
 
 function App(): React.JSX.Element {
-  const [page, setPage] = useState<PageId>('accounts')
+  const [page, setPage] = useState<PageId>('dashboard')
   const [target, setTarget] = useState<NavigationTarget | null>(null)
   const navigate: PageProps['navigate'] = (next, item) => {
     setPage(next)

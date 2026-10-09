@@ -175,7 +175,39 @@ export interface BalanceBefore {
   existing: BalanceSnapshot | null
 }
 
+// 대시보드 값은 조회 시 계산하며 null(미입력)과 0을 구분한다.
+export interface DashboardData {
+  date: string
+  accountCount: number
+  missingCount: number
+  assets: {
+    total: number | null
+    composition: (PurposeAmount & { name: string; color: string; share: number | null })[]
+  }
+  month: {
+    year: number
+    month: number
+    income: number
+    payment: number
+    remaining: number
+    incoming: number
+    outgoing: number
+  }
+  upcoming: {
+    total: number
+    items: {
+      flowId: number
+      name: string
+      kind: FlowKind
+      date: string
+      days: number
+      amount: number
+    }[]
+  }
+}
+
 export interface Api {
+  getDashboard(date?: string): Promise<Result<DashboardData>>
   listBalances(date?: string): Promise<Result<AccountBalance[]>>
   listPurposeAmounts(date?: string): Promise<Result<PurposeAmount[]>>
   listBalanceSnapshots(accountId: number): Promise<Result<BalanceHistory[]>>

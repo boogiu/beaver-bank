@@ -11,6 +11,7 @@ import type {
   BalanceBefore,
   BalanceHistory,
   BalanceSnapshotInput,
+  DashboardData,
   PurposeAmount,
   Account,
   AccountInput,
@@ -795,6 +796,107 @@ export function listPurposeAmounts(date?: string): PurposeAmount[] {
     accountRows,
     accountRows.map((row) => calculateBalance(row.id, value, data, now))
   )
+}
+
+export function getDashboard(date?: string): DashboardData {
+  const value = queryDate(date)
+  const db = openDatabase()
+  // 조회 한 번에서 흐름·보정·예외를 읽어 잔액과 두 달 회차에 함께 쓴다.
+  const data = readBalanceData()
+  const accountRows = db.select().from(accounts).where(eq(accounts.isActive, true)).all()
+  const purposeRows = db
+    .select()
+    .from(purposes)
+    .orderBy(asc(purposes.sortOrder), asc(purposes.id))
+    .all()
+  const balances = accountRows.map((account) => calculateBalance(account.id, value, data, value))
+  const known = balances.flatMap((row) => (row.balance === null ? [] : [row.balance]))
+  const amounts = calculatePurposeAmounts(
+    purposeRows.map((row) => row.id),
+    accountRows,
+    balances
+  ).filter((row) => row.accountCount > 0)
+  const positiveTotal = amounts.reduce((sum, row) => sum + Math.max(0, row.amount ?? 0), 0)
+  const names = new Map(purposeRows.map((row) => [row.id, row]))
+  const composition = amounts.map((row) => ({
+    ...row,
+    name: row.purposeId === null ? '용도 없음' : names.get(row.purposeId)!.name,
+    color: row.purposeId === null ? '#666666' : names.get(row.purposeId)!.color,
+    share:
+      row.amount !== null && row.amount > 0
+        ? Math.round((row.amount * 1000) / positiveTotal) / 10
+        : null
+  }))
+  const [year, month] = value.split('-').map(Number)
+  const exceptions = new Map(
+    data.overrides.map((row) => [`${row.flowId}:${row.occurrenceDate}`, row])
+  )
+  const occurrences: {
+    flowId: number
+    name: string
+    kind: FlowInput['kind']
+    date: string
+    sortOrder: number
+    amount: number
+    skipped: boolean
+    fromAccountId: number | null
+    toAccountId: number | null
+  }[] = []
+  for (let offset = 0; offset < 2; offset++) {
+    const index = year * 12 + month - 1 + offset
+    for (const flow of data.flows) {
+      const day = occurrenceDate(flow, Math.floor(index / 12), (index % 12) + 1)
+      if (!day) continue
+      const exception = exceptions.get(`${flow.id}:${day}`)
+      occurrences.push({
+        flowId: flow.id,
+        name: flow.name,
+        kind: flow.kind,
+        date: day,
+        sortOrder: flow.id,
+        amount: exception?.skipped ? 0 : (exception?.actualAmount ?? flow.amount),
+        skipped: exception?.skipped ?? false,
+        fromAccountId: flow.fromAccountId,
+        toAccountId: flow.toAccountId
+      })
+    }
+  }
+  const currentMonth = occurrences.filter((row) => row.date.slice(0, 7) === value.slice(0, 7))
+  const totals = sumOccurrences(currentMonth)
+  const futureTotals = sumOccurrences(currentMonth.filter((row) => row.date > value))
+  const upcoming = occurrences
+    .filter((row) => row.date > value && !row.skipped)
+    .sort(compareOccurrences)
+  const calendarTime = (day: string): number => Date.parse(`${day}T00:00:00Z`)
+  return {
+    date: value,
+    accountCount: accountRows.length,
+    missingCount: balances.length - known.length,
+    assets: {
+      total: known.length ? known.reduce((sum, amount) => sum + amount, 0) : null,
+      composition
+    },
+    month: {
+      year,
+      month,
+      income: totals.income,
+      payment: totals.payment,
+      remaining: totals.remaining,
+      incoming: futureTotals.income,
+      outgoing: futureTotals.payment
+    },
+    upcoming: {
+      total: upcoming.length,
+      items: upcoming.slice(0, 5).map((row) => ({
+        flowId: row.flowId,
+        name: row.name,
+        kind: row.kind,
+        date: row.date,
+        days: (calendarTime(row.date) - calendarTime(value)) / 86_400_000,
+        amount: row.amount
+      }))
+    }
+  }
 }
 export function listBalanceSnapshots(accountId: number): BalanceHistory[] {
   balanceAccount(accountId)

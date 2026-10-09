@@ -44,4 +44,4 @@ BeaverBank는 여러 계좌(적금, 용도별 통장)와 매달 반복되는 돈
 
 [MIT](./LICENSE)
 
-화면 글꼴은 Pretendard(오픈 폰트 라이선스), 선 아이콘은 Lucide(ISC 라이선스), 그래프 배치는 d3-force(ISC 라이선스)를 사용합니다. 글꼴·아이콘 라이선스 전문은 `licenses/`에 있고, d3-force 라이선스는 npm 패키지에 포함됩니다. 비버 일러스트는 이 프로젝트를 위해 제작했습니다.
+화면 글꼴은 Pretendard(오픈 폰트 라이선스), 선 아이콘은 Lucide(ISC 라이선스), 그래프 배치는 d3-force(ISC 라이선스), 차트는 ECharts(Apache-2.0 라이선스)를 사용합니다. 글꼴·아이콘 라이선스 전문은 `licenses/`에 있고, d3-force와 ECharts 라이선스는 npm 패키지에 포함됩니다. 비버 일러스트는 이 프로젝트를 위해 제작했습니다.

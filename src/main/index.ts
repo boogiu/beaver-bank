@@ -40,6 +40,7 @@ function createWindow(): void {
 }
 
 function registerIpc(): void {
+  ipcMain.handle('dashboard:get', (_, date) => service.attempt(() => service.getDashboard(date)))
   ipcMain.handle('balance:list', (_, date) => service.attempt(() => service.listBalances(date)))
   ipcMain.handle('balance:purposes', (_, date) =>
     service.attempt(() => service.listPurposeAmounts(date))
