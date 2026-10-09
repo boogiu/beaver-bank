@@ -175,11 +175,33 @@ export interface BalanceBefore {
   existing: BalanceSnapshot | null
 }
 
+export interface MaturityEstimate {
+  principal: number
+  preTaxInterest: number
+  tax: number
+  afterTaxInterest: number
+  total: number
+}
+
 // 대시보드 값은 조회 시 계산하며 null(미입력)과 0을 구분한다.
 export interface DashboardData {
   date: string
   accountCount: number
   missingCount: number
+  trend: {
+    points: { date: string; amount: number; predicted: boolean }[]
+    change: number | null
+  }
+  savings: (SavingsInput & {
+    accountId: number
+    name: string
+    type: 'installment' | 'deposit'
+    progress: number
+    remainingDays: number
+    balance: number | null
+    targetProgress: number | null
+    maturity: MaturityEstimate | null
+  })[]
   assets: {
     total: number | null
     composition: (PurposeAmount & { name: string; color: string; share: number | null })[]

@@ -29,6 +29,7 @@ import type {
   SavingsInput
 } from '../../shared/ipc'
 import { openDatabase as openUserDatabase, type AppDatabase } from './index'
+import { calculateMaturity, daysBetween } from '../../shared/savings'
 import {
   accounts,
   balanceSnapshots,
@@ -868,10 +869,76 @@ export function getDashboard(date?: string): DashboardData {
     .filter((row) => row.date > value && !row.skipped)
     .sort(compareOccurrences)
   const calendarTime = (day: string): number => Date.parse(`${day}T00:00:00Z`)
+  const trendAccounts = balances.filter((row) => row.balance !== null)
+  const points: DashboardData['trend']['points'] = []
+  if (trendAccounts.length) {
+    points.push({
+      date: value,
+      amount: known.reduce((sum, amount) => sum + amount, 0),
+      predicted: false
+    })
+    for (let offset = 0; points.length < 13; offset++) {
+      const index = year * 12 + month - 1 + offset
+      const day = monthEnd(Math.floor(index / 12), (index % 12) + 1)
+      if (day <= value) continue
+      points.push({
+        date: day,
+        predicted: true,
+        amount: trendAccounts.reduce(
+          (sum, account) => sum + calculateBalance(account.accountId, day, data, value).balance!,
+          0
+        )
+      })
+    }
+  }
+  const details = new Map(
+    db
+      .select()
+      .from(savingsDetails)
+      .all()
+      .map((row) => [row.accountId, row])
+  )
+  const savings: DashboardData['savings'] = accountRows
+    .filter((row) => row.type === 'installment' || row.type === 'deposit')
+    .sort(
+      (a, b) =>
+        details.get(a.id)!.maturityDate.localeCompare(details.get(b.id)!.maturityDate) ||
+        a.sortOrder - b.sortOrder ||
+        a.id - b.id
+    )
+    .map((row) => {
+      const detail = details.get(row.id)!
+      const balance = balances.find((item) => item.accountId === row.id)!.balance
+      return {
+        ...detail,
+        accountId: row.id,
+        name: row.name,
+        type: row.type as 'installment' | 'deposit',
+        progress: Math.max(
+          0,
+          Math.min(
+            100,
+            Math.floor(
+              (daysBetween(detail.startDate, value) * 100) /
+                daysBetween(detail.startDate, detail.maturityDate)
+            )
+          )
+        ),
+        remainingDays: daysBetween(value, detail.maturityDate),
+        balance,
+        targetProgress:
+          detail.targetAmount && balance !== null
+            ? Math.max(0, Number((BigInt(balance) * 100n) / BigInt(detail.targetAmount)))
+            : null,
+        maturity: calculateMaturity(row.id, detail, data)
+      }
+    })
   return {
     date: value,
     accountCount: accountRows.length,
     missingCount: balances.length - known.length,
+    trend: { points, change: points.length ? points.at(-1)!.amount - points[0].amount : null },
+    savings,
     assets: {
       total: known.length ? known.reduce((sum, amount) => sum + amount, 0) : null,
       composition

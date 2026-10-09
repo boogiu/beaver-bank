@@ -874,23 +874,20 @@ select:focus-visible,
 }
 .graph-node {
   cursor: pointer;
+  transition: opacity 0.2s;
 }
 .graph-node circle,
-.graph-node rect {
-  stroke: var(--muted);
-  stroke-width: 1px;
-}
+.graph-node rect,
 .graph-node path {
-  stroke: var(--muted);
-  stroke-width: 1px;
-}
-.graph-node.inactive circle,
-.graph-node.inactive rect {
-  stroke-dasharray: 3 2;
+  stroke: none;
 }
 .graph-link {
   stroke: var(--muted);
-  stroke-width: 1.5px;
+  stroke-width: 1px;
+  transition: opacity 0.2s;
+}
+.graph-label {
+  transition: fill 0.2s;
 }
 .graph-label,
 .graph-inactive {
@@ -1000,6 +997,100 @@ select:focus-visible,
 }
 
 /* 대시보드: 계산한 응답을 표시하며 페이지 영역만 스크롤한다. */
+.dashboard-savings-list {
+  display: grid;
+  gap: 12px;
+}
+.dashboard-saving {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.dashboard-saving:hover {
+  background: var(--button-hover);
+}
+.dashboard-saving:active {
+  background: var(--border);
+}
+.dashboard-saving-title,
+.dashboard-saving-info,
+.dashboard-saving-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.dashboard-saving-title > svg {
+  flex-shrink: 0;
+}
+.dashboard-saving-title {
+  margin-bottom: 8px;
+}
+.dashboard-saving-info {
+  font-size: var(--size-xs);
+}
+.dashboard-saving-line {
+  justify-content: space-between;
+  margin-top: 12px;
+  font-size: var(--size-sm);
+}
+.dashboard-saving-target {
+  display: block;
+}
+.dashboard-progress {
+  display: block;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.dashboard-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--focus);
+}
+.dashboard-progress.target > span {
+  background: var(--brown);
+}
+.dashboard-maturity {
+  margin-bottom: 8px;
+}
+.dashboard-estimate {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: var(--size-xs);
+}
+.dashboard-estimate-note {
+  margin: 16px 0 0;
+  font-size: var(--size-xs);
+  line-height: 1.6;
+}
+.dashboard-trend {
+  min-width: 0;
+  width: 100%;
+  height: 280px;
+}
+.dashboard-trend-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.dashboard-trend-summary > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .dashboard-head {
   flex-wrap: wrap;
 }

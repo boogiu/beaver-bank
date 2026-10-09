@@ -490,6 +490,11 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                     }
                     markerStart={link.reverse ? 'url(#graph-arrow-focus)' : undefined}
                     style={{
+                      opacity: hovered
+                        ? link.source === hovered || link.target === hovered
+                          ? 1
+                          : 0.15
+                        : 0.5,
                       stroke:
                         link.kind === 'account-payment'
                           ? 'var(--amber)'
@@ -501,9 +506,6 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                     y1={(a.y ?? 0) + uy * (radius(a) + (link.reverse ? 6 : 0))}
                     x2={(b.x ?? 0) - ux * (radius(b) + (directed ? 6 : 0))}
                     y2={(b.y ?? 0) - uy * (radius(b) + (directed ? 6 : 0))}
-                    opacity={
-                      hovered && link.source !== hovered && link.target !== hovered ? 0.22 : 1
-                    }
                   />
                 )
               })}
@@ -514,7 +516,9 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                     key={node.id}
                     className={`graph-node ${node.inactive ? 'inactive' : ''}`}
                     transform={`translate(${node.x},${node.y})`}
-                    opacity={hovered && !connected.has(node.id) ? 0.22 : node.inactive ? 0.58 : 1}
+                    style={{
+                      opacity: hovered && !connected.has(node.id) ? 0.22 : node.inactive ? 0.58 : 1
+                    }}
                     onPointerEnter={() => setHovered(node.id)}
                     onPointerLeave={() => setHovered(null)}
                     onPointerDown={(event) => nodeDown(event, node)}
@@ -530,7 +534,14 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                     ) : (
                       <circle r={shape === 'large-circle' ? 28 : 20} fill={node.color} />
                     )}
-                    <text className="graph-label" y={radius(node) + 18} textAnchor="middle">
+                    <text
+                      className="graph-label"
+                      y={radius(node) + 18}
+                      textAnchor="middle"
+                      style={{
+                        fill: hovered && connected.has(node.id) ? 'var(--text)' : 'var(--muted)'
+                      }}
+                    >
                       {labelLines(node.name).map((line, index) => (
                         <tspan key={index} x={0} dy={index === 0 ? 0 : 14}>
                           {line}

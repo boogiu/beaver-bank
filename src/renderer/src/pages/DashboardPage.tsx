@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import type { DashboardData } from '@shared/ipc'
 import type { PageProps } from '../App'
 import { Button, EmptyState, Icon } from '../components/Ui'
-import { FLOW_INFO, money } from '../components/domain-ui'
+import { ACCOUNT_INFO, FLOW_INFO, money } from '../components/domain-ui'
 import DashboardDonut from '../components/DashboardDonut'
+import DashboardTrend from '../components/DashboardTrend'
 
 function AssetAmount({
   amount,
@@ -19,6 +20,20 @@ function AssetAmount({
       <span className={amount < 0 ? 'negative' : ''}>{money(amount)}</span>
       {missingCount > 0 && <span className="muted dashboard-missing">미입력 {missingCount}개</span>}
     </>
+  )
+}
+
+function ProgressBar({
+  value,
+  target = false
+}: {
+  value: number
+  target?: boolean
+}): React.JSX.Element {
+  return (
+    <span className={`dashboard-progress ${target ? 'target' : ''}`} aria-hidden="true">
+      <span style={{ width: `${Math.min(100, value)}%` }} />
+    </span>
   )
 }
 
@@ -183,6 +198,120 @@ export default function DashboardPage({ navigate }: PageProps): React.JSX.Elemen
                 </p>
               )}
               <Button onClick={() => navigate('flows')}>흐름 페이지로 이동</Button>
+            </section>
+            <section className="panel dashboard-panel" aria-labelledby="trend-title">
+              <h2 id="trend-title">예상 잔액 추이</h2>
+              {data.trend.points.length ? (
+                <>
+                  <div className="dashboard-trend-summary">
+                    <span>
+                      오늘 <AssetAmount amount={data.trend.points[0].amount} missingCount={0} />
+                    </span>
+                    <span>
+                      {data.trend.points.at(-1)!.date} <span className="badge">예상</span>{' '}
+                      <AssetAmount amount={data.trend.points.at(-1)!.amount} missingCount={0} />
+                    </span>
+                    <span className="muted">
+                      {data.trend.change! > 0 ? '+' : ''}
+                      {money(data.trend.change!)}
+                    </span>
+                  </div>
+                  <DashboardTrend points={data.trend.points} />
+                </>
+              ) : (
+                <p className="muted">잔액을 입력하면 예상 잔액 추이가 보입니다</p>
+              )}
+            </section>
+            <section className="panel dashboard-panel" aria-labelledby="savings-title">
+              <h2 id="savings-title">적금·예금 진행</h2>
+              {data.savings.length === 0 ? (
+                <p className="muted">사용 중인 적금·예금 계좌가 없습니다</p>
+              ) : (
+                <>
+                  <div className="dashboard-savings-list">
+                    {data.savings.map((item) => (
+                      <button
+                        type="button"
+                        className="dashboard-saving"
+                        key={item.accountId}
+                        onClick={() =>
+                          navigate('accounts', {
+                            kind: 'account',
+                            id: item.accountId,
+                            inactive: false
+                          })
+                        }
+                      >
+                        <span className="dashboard-saving-title">
+                          <Icon icon={ACCOUNT_INFO[item.type].icon} size={18} />
+                          <span className="muted">{ACCOUNT_INFO[item.type].label}</span>
+                          <strong className="dashboard-name">{item.name}</strong>
+                        </span>
+                        <span className="muted dashboard-saving-info">
+                          <span>
+                            {item.startDate} ~ {item.maturityDate}
+                          </span>
+                          <span>연 {item.interestRate}%</span>
+                          <span>{item.interestType === 'simple' ? '단리' : '복리'}</span>
+                          <span>
+                            {
+                              { normal: '일반과세', preferential: '세금우대', tax_free: '비과세' }[
+                                item.taxType
+                              ]
+                            }
+                          </span>
+                        </span>
+                        <span className="muted dashboard-saving-line">
+                          <span>기간 {item.progress}%</span>
+                          <span>
+                            {item.remainingDays > 0
+                              ? `만기까지 ${item.remainingDays}일`
+                              : item.remainingDays === 0
+                                ? '오늘 만기'
+                                : '만기 지남'}
+                          </span>
+                        </span>
+                        <ProgressBar value={item.progress} />
+                        <span className="dashboard-saving-line">
+                          잔액 <AssetAmount amount={item.balance} missingCount={0} />
+                        </span>
+                        {item.targetAmount !== null && item.targetAmount > 0 && (
+                          <span className="dashboard-saving-target">
+                            <span className="dashboard-saving-line">
+                              <span>목표 {money(item.targetAmount)}</span>
+                              {item.targetProgress !== null && (
+                                <span className="muted">{item.targetProgress}%</span>
+                              )}
+                            </span>
+                            {item.targetProgress !== null && (
+                              <ProgressBar value={item.targetProgress} target />
+                            )}
+                          </span>
+                        )}
+                        <span className="dashboard-saving-line dashboard-maturity">
+                          <span>
+                            만기 예상 수령액{' '}
+                            <AssetAmount amount={item.maturity?.total ?? null} missingCount={0} />
+                          </span>
+                          {item.maturity && <span className="muted dashboard-estimate">추정</span>}
+                        </span>
+                        {item.maturity && (
+                          <span className="dashboard-saving-info">
+                            <span>
+                              원금 <AssetAmount amount={item.maturity.principal} missingCount={0} />
+                            </span>
+                            <span>세후 이자 {money(item.maturity.afterTaxInterest)}</span>
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="muted dashboard-estimate-note">
+                    만기 예상 수령액은 등록된 흐름이 그대로 실행된다고 보고 계산한 추정값이며 실제
+                    수령액과 다를 수 있습니다.
+                  </p>
+                </>
+              )}
             </section>
           </div>
         ))}
