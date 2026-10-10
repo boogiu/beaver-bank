@@ -491,6 +491,265 @@ select:focus-visible,
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 12px;
 }
+/* Payment-card faces are scoped to CardsPage; shared item cards stay unchanged. */
+.payment-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 312px);
+  gap: 16px;
+}
+.payment-card-unit {
+  width: 312px;
+  /* Keep text rasterization consistent with and without the entrance animation. */
+  will-change: transform;
+}
+.payment-card-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 8px;
+}
+.payment-face {
+  --face-inset: 18px;
+  position: relative;
+  isolation: isolate;
+  width: 312px;
+  height: 197px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 400;
+  transition:
+    translate 0.15s ease-out,
+    border-color 0.15s ease-out;
+}
+.payment-face-debit {
+  background: linear-gradient(135deg, var(--face-light) 0%, var(--face-dark) 100%);
+}
+.payment-face-credit {
+  background: linear-gradient(135deg, var(--face-light) 0%, #262626 55%, #161616 100%);
+}
+.payment-face > * {
+  position: absolute;
+  z-index: 1;
+}
+.payment-face-name,
+.payment-face-issuer {
+  left: calc(var(--face-inset) - 1px);
+  right: calc(var(--face-inset) - 1px);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.payment-face-name {
+  top: 17px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.payment-face-issuer {
+  top: 39px;
+  line-height: 16px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.payment-face-chip {
+  left: calc(var(--face-inset) - 1px);
+  top: 71px;
+  width: 34px;
+  height: 26px;
+  border-radius: 5px;
+  background: #e0a93b;
+  overflow: hidden;
+  pointer-events: none;
+}
+.payment-face-chip path {
+  fill: none;
+  stroke: #6d462f;
+  stroke-width: 1px;
+}
+.payment-face-kind {
+  top: 76px;
+  right: calc(var(--face-inset) - 1px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  line-height: 16px;
+}
+.payment-face-number {
+  left: calc(var(--face-inset) - 1px);
+  top: 113px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 18px;
+}
+.payment-face-dots {
+  display: flex;
+  gap: 4px;
+}
+.payment-face-dots > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+}
+.payment-face-tail {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+}
+.payment-face-footer {
+  top: 146px;
+  left: calc(var(--face-inset) - 1px);
+  right: calc(var(--face-inset) - 1px);
+  display: flex;
+  gap: 12px;
+}
+.payment-face-account {
+  flex: 1;
+  min-width: 0;
+}
+.payment-face-label {
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 14px;
+}
+.payment-face-value {
+  display: flex;
+  font-size: 14px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.payment-face-account-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.payment-face-account-closed {
+  flex-shrink: 0;
+  white-space: pre;
+}
+.payment-face-unlinked {
+  color: rgba(255, 255, 255, 0.85);
+}
+.payment-face-day {
+  flex-shrink: 0;
+  text-align: right;
+}
+.payment-face-day .payment-face-value {
+  justify-content: flex-end;
+}
+.payment-face-badge {
+  top: calc(var(--face-inset) - 1px);
+  right: calc(var(--face-inset) - 1px);
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  line-height: 16px;
+}
+.payment-face-closed {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--muted);
+}
+.payment-face-closed .payment-face-name,
+.payment-face-closed .payment-face-issuer {
+  /* Reserve the badge width plus a 12px gap for both title lines. */
+  right: calc(var(--face-inset) + 50px);
+}
+.payment-face-closed .payment-face-issuer,
+.payment-face-closed .payment-face-label,
+.payment-face-closed .payment-face-unlinked {
+  color: var(--muted);
+}
+.payment-face-closed .payment-face-dots > span,
+.payment-face-closed .payment-face-chip {
+  background: var(--muted);
+}
+.payment-face-closed .payment-face-chip path {
+  stroke: var(--surface);
+}
+.payment-card-unit:hover .payment-face {
+  translate: 0 -2px;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+.payment-card-unit:hover .payment-face-closed {
+  border-color: var(--muted);
+}
+.payment-face-highlighted,
+.payment-card-unit:hover .payment-face-highlighted {
+  border-color: var(--focus);
+  outline: 1px solid var(--focus);
+}
+.payment-face:not(.payment-face-closed)::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: -50%;
+  left: -80%;
+  width: 45%;
+  height: 200%;
+  transform: skewX(-20deg);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+}
+.payment-card-unit:hover .payment-face:not(.payment-face-closed)::before {
+  animation: payment-face-sheen 0.6s ease-out;
+}
+@keyframes payment-face-sheen {
+  from {
+    left: -80%;
+  }
+  to {
+    left: 150%;
+  }
+}
+@media (max-width: 1050px) {
+  .payment-card-grid {
+    grid-template-columns: repeat(auto-fill, 280px);
+  }
+  .payment-card-unit {
+    width: 280px;
+  }
+  .payment-face {
+    --face-inset: 16px;
+    width: 280px;
+    height: 177px;
+  }
+  .payment-face-name {
+    top: 15px;
+  }
+  .payment-face-issuer {
+    top: 37px;
+  }
+  .payment-face-chip {
+    top: 63px;
+  }
+  .payment-face-kind {
+    top: 68px;
+  }
+  .payment-face-number {
+    top: 99px;
+  }
+  .payment-face-footer {
+    top: 128px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .payment-card-unit:hover .payment-face {
+    translate: none;
+  }
+  .payment-face::before {
+    display: none;
+  }
+}
 .card-title {
   font-size: var(--size-lg);
   font-weight: 600;

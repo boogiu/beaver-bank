@@ -4,9 +4,10 @@ import { Ban, Pencil, RotateCcw } from 'lucide-react'
 import { CARD_TYPES } from '@shared/domain'
 import type { Account, ApiError, Card, CardInput, Purpose } from '@shared/ipc'
 import type { PageProps } from '../App'
-import { AddButton, Button, EmptyState, Icon, Switch } from '../components/Ui'
+import { AddButton, Button, EmptyState, Switch } from '../components/Ui'
 import { ConfirmModal, Field, Modal, Select } from '../components/Modal'
 import { CARD_INFO } from '../components/domain-ui'
+import { PaymentCardFace } from '../components/PaymentCardFace'
 
 const blank: CardInput = {
   name: '',
@@ -227,42 +228,23 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
             />
           </Entrance>
         ) : (
-          <div className="card-grid">
+          <div className="payment-card-grid">
             {shown.map((card) => {
-              const info = CARD_INFO[card.type]
+              const account = accounts.find((account) => account.id === card.accountId)
+              const purpose = purposes.find((purpose) => purpose.id === account?.purposeId)
               return (
                 <Entrance order={entranceIndex++} wrap key={card.id}>
                   <article
                     id={`card-${card.id}`}
 
-                    className={`item-card payment-card ${!card.isActive ? 'inactive' : ''} ${target?.kind === 'card' && target.id === card.id ? 'highlighted' : ''}`}
+                    className="payment-card-unit"
                   >
-                    <div className="card-top">
-                      <div className="card-kind">
-                        <Icon icon={info.icon} size={18} />
-                        {info.label}
-                      </div>
-                      {!card.isActive && <span className="badge">해지</span>}
-                    </div>
-                    <div className="card-title" title={card.name}>
-                      {card.name}
-                    </div>
-                    <div className="card-subtitle">
-                      {card.issuer}
-                      {card.numberTail && ` · ${card.numberTail}`}
-                    </div>
-                    {card.linkedAccount && (
-                      <div className="card-details">
-                        <span>
-                          연결: {card.linkedAccount.name}
-                          {!card.linkedAccount.isActive && ' (해지)'}
-                        </span>
-                      </div>
-                    )}
-                    {card.type === 'credit' && (
-                      <div className="card-details">매월 {card.paymentDay}일</div>
-                    )}
-                    <div className="card-actions">
+                    <PaymentCardFace
+                      card={card}
+                      purposeColor={purpose?.color}
+                      highlighted={target?.kind === 'card' && target.id === card.id}
+                    />
+                    <div className="payment-card-actions">
                       {card.isActive ? (
                         <>
                           <Button icon={Pencil} onClick={() => setEditing(card)}>
