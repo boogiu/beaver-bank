@@ -1,3 +1,5 @@
+import { AnimatedAmount } from '../components/AnimatedAmount'
+import { useVisibleValue } from '../hooks/useVisibleOnce'
 import { Entrance } from '../components/Entrance'
 import { useEffect, useState } from 'react'
 import type { DashboardData } from '@shared/ipc'
@@ -31,9 +33,10 @@ function ProgressBar({
   value: number
   target?: boolean
 }): React.JSX.Element {
+  const { ref, value: displayed } = useVisibleValue<HTMLSpanElement>(Math.min(100, value))
   return (
-    <span className={`dashboard-progress ${target ? 'target' : ''}`} aria-hidden="true">
-      <span style={{ width: `${Math.min(100, value)}%` }} />
+    <span ref={ref} className={`dashboard-progress ${target ? 'target' : ''}`} aria-hidden="true">
+      <span style={{ width: `${displayed}%` }} />
     </span>
   )
 }
@@ -99,7 +102,10 @@ export default function DashboardPage({ navigate }: PageProps): React.JSX.Elemen
                 <div className="dashboard-total">
                   <span className="muted">전체 잔액</span>
                   <div className="dashboard-total-value">
-                    <AssetAmount amount={data.assets.total} missingCount={data.missingCount} />
+                    <AnimatedAmount amount={data.assets.total} />
+                    {data.assets.total !== null && data.missingCount > 0 && (
+                      <span className="muted dashboard-missing">미입력 {data.missingCount}개</span>
+                    )}
                   </div>
                 </div>
                 <div className="dashboard-assets">
@@ -157,21 +163,27 @@ export default function DashboardPage({ navigate }: PageProps): React.JSX.Elemen
                 <dl className="dashboard-month-totals">
                   <div className="dashboard-income">
                     <dt>수입 합계</dt>
-                    <dd>{money(data.month.income)}</dd>
+                    <dd>
+                      <AnimatedAmount amount={data.month.income} />
+                    </dd>
                     <dd className="muted dashboard-planned">
                       들어올 예정 {money(data.month.incoming)}
                     </dd>
                   </div>
                   <div className="dashboard-payment">
                     <dt>정기 결제 합계</dt>
-                    <dd>{money(data.month.payment)}</dd>
+                    <dd>
+                      <AnimatedAmount amount={data.month.payment} />
+                    </dd>
                     <dd className="muted dashboard-planned">
                       나갈 예정 {money(data.month.outgoing)}
                     </dd>
                   </div>
                   <div className="dashboard-remaining">
                     <dt>남는 금액</dt>
-                    <dd>{money(data.month.remaining)}</dd>
+                    <dd>
+                      <AnimatedAmount amount={data.month.remaining} />
+                    </dd>
                   </div>
                 </dl>
                 <h3>다가오는 회차</h3>
@@ -245,84 +257,87 @@ export default function DashboardPage({ navigate }: PageProps): React.JSX.Elemen
                     <div className="dashboard-savings-list">
                       {data.savings.map((item) => (
                         <div className="hover-hit" key={item.accountId}>
-                        <button
-                          type="button"
-                          className="dashboard-saving"
-                          onClick={() =>
-                            navigate('accounts', {
-                              kind: 'account',
-                              id: item.accountId,
-                              inactive: false
-                            })
-                          }
-                        >
-                          <span className="dashboard-saving-title">
-                            <Icon icon={ACCOUNT_INFO[item.type].icon} size={18} />
-                            <span className="muted">{ACCOUNT_INFO[item.type].label}</span>
-                            <strong className="dashboard-name">{item.name}</strong>
-                          </span>
-                          <span className="muted dashboard-saving-info">
-                            <span>
-                              {item.startDate} ~ {item.maturityDate}
+                          <button
+                            type="button"
+                            className="dashboard-saving"
+                            onClick={() =>
+                              navigate('accounts', {
+                                kind: 'account',
+                                id: item.accountId,
+                                inactive: false
+                              })
+                            }
+                          >
+                            <span className="dashboard-saving-title">
+                              <Icon icon={ACCOUNT_INFO[item.type].icon} size={18} />
+                              <span className="muted">{ACCOUNT_INFO[item.type].label}</span>
+                              <strong className="dashboard-name">{item.name}</strong>
                             </span>
-                            <span>연 {item.interestRate}%</span>
-                            <span>{item.interestType === 'simple' ? '단리' : '복리'}</span>
-                            <span>
-                              {
+                            <span className="muted dashboard-saving-info">
+                              <span>
+                                {item.startDate} ~ {item.maturityDate}
+                              </span>
+                              <span>연 {item.interestRate}%</span>
+                              <span>{item.interestType === 'simple' ? '단리' : '복리'}</span>
+                              <span>
                                 {
-                                  normal: '일반과세',
-                                  preferential: '세금우대',
-                                  tax_free: '비과세'
-                                }[item.taxType]
-                              }
+                                  {
+                                    normal: '일반과세',
+                                    preferential: '세금우대',
+                                    tax_free: '비과세'
+                                  }[item.taxType]
+                                }
+                              </span>
                             </span>
-                          </span>
-                          <span className="muted dashboard-saving-line">
-                            <span>기간 {item.progress}%</span>
-                            <span>
-                              {item.remainingDays > 0
-                                ? `만기까지 ${item.remainingDays}일`
-                                : item.remainingDays === 0
-                                  ? '오늘 만기'
-                                  : '만기 지남'}
+                            <span className="muted dashboard-saving-line">
+                              <span>기간 {item.progress}%</span>
+                              <span>
+                                {item.remainingDays > 0
+                                  ? `만기까지 ${item.remainingDays}일`
+                                  : item.remainingDays === 0
+                                    ? '오늘 만기'
+                                    : '만기 지남'}
+                              </span>
                             </span>
-                          </span>
-                          <ProgressBar value={item.progress} />
-                          <span className="dashboard-saving-line">
-                            잔액 <AssetAmount amount={item.balance} missingCount={0} />
-                          </span>
-                          {item.targetAmount !== null && item.targetAmount > 0 && (
-                            <span className="dashboard-saving-target">
-                              <span className="dashboard-saving-line">
-                                <span>목표 {money(item.targetAmount)}</span>
+                            <ProgressBar value={item.progress} />
+                            <span className="dashboard-saving-line">
+                              잔액 <AssetAmount amount={item.balance} missingCount={0} />
+                            </span>
+                            {item.targetAmount !== null && item.targetAmount > 0 && (
+                              <span className="dashboard-saving-target">
+                                <span className="dashboard-saving-line">
+                                  <span>목표 {money(item.targetAmount)}</span>
+                                  {item.targetProgress !== null && (
+                                    <span className="muted">{item.targetProgress}%</span>
+                                  )}
+                                </span>
                                 {item.targetProgress !== null && (
-                                  <span className="muted">{item.targetProgress}%</span>
+                                  <ProgressBar value={item.targetProgress} target />
                                 )}
                               </span>
-                              {item.targetProgress !== null && (
-                                <ProgressBar value={item.targetProgress} target />
+                            )}
+                            <span className="dashboard-saving-line dashboard-maturity">
+                              <span>
+                                만기 예상 수령액{' '}
+                                <AssetAmount
+                                  amount={item.maturity?.total ?? null}
+                                  missingCount={0}
+                                />
+                              </span>
+                              {item.maturity && (
+                                <span className="muted dashboard-estimate">추정</span>
                               )}
                             </span>
-                          )}
-                          <span className="dashboard-saving-line dashboard-maturity">
-                            <span>
-                              만기 예상 수령액{' '}
-                              <AssetAmount amount={item.maturity?.total ?? null} missingCount={0} />
-                            </span>
                             {item.maturity && (
-                              <span className="muted dashboard-estimate">추정</span>
-                            )}
-                          </span>
-                          {item.maturity && (
-                            <span className="dashboard-saving-info">
-                              <span>
-                                원금{' '}
-                                <AssetAmount amount={item.maturity.principal} missingCount={0} />
+                              <span className="dashboard-saving-info">
+                                <span>
+                                  원금{' '}
+                                  <AssetAmount amount={item.maturity.principal} missingCount={0} />
+                                </span>
+                                <span>세후 이자 {money(item.maturity.afterTaxInterest)}</span>
                               </span>
-                              <span>세후 이자 {money(item.maturity.afterTaxInterest)}</span>
-                            </span>
-                          )}
-                        </button>
+                            )}
+                          </button>
                         </div>
                       ))}
                     </div>
