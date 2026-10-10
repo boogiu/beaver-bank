@@ -1,3 +1,4 @@
+import { Entrance } from '../components/Entrance'
 import { useEffect, useState } from 'react'
 import type { DbStatus } from '@shared/ipc'
 
@@ -12,6 +13,8 @@ const TABLE_LABELS: Record<string, string> = {
 }
 
 export default function InfoPage(): React.JSX.Element {
+  let entranceIndex = 0
+
   const [status, setStatus] = useState<DbStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
@@ -22,29 +25,33 @@ export default function InfoPage(): React.JSX.Element {
   }, [])
   return (
     <>
-      <header className="page-head">
-        <div>
-          <h1>정보</h1>
-          <p>데이터베이스와 앱의 현재 상태</p>
-        </div>
-      </header>
+      <Entrance order={entranceIndex++}>
+        <header className="page-head">
+          <div>
+            <h1>정보</h1>
+            <p>데이터베이스와 앱의 현재 상태</p>
+          </div>
+        </header>
+      </Entrance>
       {error && <p className="error-banner">{error}</p>}
       {status && (
-        <div className="panel info-panel">
-          <div>
-            <span className="muted">DB 파일 {status.isDev && '(개발용)'}</span>
-            <p className="path-text">{status.path}</p>
+        <Entrance order={entranceIndex++}>
+          <div className="panel info-panel">
+            <div>
+              <span className="muted">DB 파일 {status.isDev && '(개발용)'}</span>
+              <p className="path-text">{status.path}</p>
+            </div>
+            <p>적용된 마이그레이션: {status.migrations}개</p>
+            <div className="status-grid">
+              {status.tables.map((table) => (
+                <div className="status-item" key={table.name}>
+                  <span>{TABLE_LABELS[table.name] ?? table.name}</span>
+                  <strong>{table.rows}</strong>
+                </div>
+              ))}
+            </div>
           </div>
-          <p>적용된 마이그레이션: {status.migrations}개</p>
-          <div className="status-grid">
-            {status.tables.map((table) => (
-              <div className="status-item" key={table.name}>
-                <span>{TABLE_LABELS[table.name] ?? table.name}</span>
-                <strong>{table.rows}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
+        </Entrance>
       )}
     </>
   )

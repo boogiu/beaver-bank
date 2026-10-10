@@ -1,3 +1,4 @@
+import { Entrance } from '../components/Entrance'
 import { AmountInput } from '../components/AmountInput'
 import { useCallback, useEffect, useState } from 'react'
 import { Pencil, RotateCcw, Ban, SlidersHorizontal } from 'lucide-react'
@@ -227,6 +228,9 @@ function AccountForm({
 }
 
 export default function AccountsPage({ target }: PageProps): React.JSX.Element {
+  let entranceIndex = 0
+
+  const [loaded, setLoaded] = useState(false)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [purposes, setPurposes] = useState<Purpose[]>([])
   const [balances, setBalances] = useState<AccountBalance[]>([])
@@ -251,6 +255,7 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
     else setError(balanceResult.error.message)
     if (amountResult.ok) setAmounts(amountResult.data)
     else setError(amountResult.error.message)
+    if (accountResult.ok && purposeResult.ok && balanceResult.ok && amountResult.ok) setLoaded(true)
   }, [])
   useEffect(() => {
     void Promise.resolve().then(refresh)
@@ -279,123 +284,138 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
   ]
   return (
     <>
-      <header className="page-head">
-        <div>
-          <h1>계좌</h1>
-          <p>용도에 따라 계좌를 관리합니다.</p>
-        </div>
-        <div className="page-actions">
-          <Switch label="해지 계좌 보기" checked={showInactive} onChange={setShowInactive} />
-          <AddButton onClick={() => setEditing('add')}>계좌 추가</AddButton>
-        </div>
-      </header>
+      <Entrance order={entranceIndex++}>
+        <header className="page-head">
+          <div>
+            <h1>계좌</h1>
+            <p>용도에 따라 계좌를 관리합니다.</p>
+          </div>
+          <div className="page-actions">
+            <Switch label="해지 계좌 보기" checked={showInactive} onChange={setShowInactive} />
+            <AddButton onClick={() => setEditing('add')}>계좌 추가</AddButton>
+          </div>
+        </header>
+      </Entrance>
       {error && <p className="error-banner">{error}</p>}
-      {shown.length === 0 ? (
-        <EmptyState
-          kind="accounts"
-          title="등록된 계좌가 없습니다"
-          description="계좌를 추가해 용도별로 정리해 보세요."
-          action={<AddButton onClick={() => setEditing('add')}>계좌 추가</AddButton>}
-        />
-      ) : (
-        groups.map((group) => {
-          const members = shown.filter((account) => account.purposeId === group.id)
-          if (!members.length) return null
-          return (
-            <section className="section" key={group.id ?? 'none'}>
-              <h2>
-                {group.color && (
-                  <span className="color-dot" style={{ backgroundColor: group.color }} />
-                )}
-                <span className="purpose-heading-name">{group.label}</span>
-                <PurposeAmountLabel value={amounts.find((row) => row.purposeId === group.id)} />
-              </h2>
-              <div className="card-grid">
-                {members.map((account) => {
-                  const info = ACCOUNT_INFO[account.type]
-                  const balance = balances.find((row) => row.accountId === account.id)
-                  return (
-                    <article
-                      id={`account-${account.id}`}
-                      key={account.id}
-                      className={`item-card ${!account.isActive ? 'inactive' : ''} ${target?.kind === 'account' && target.id === account.id ? 'highlighted' : ''}`}
-                    >
-                      <div className="card-top">
-                        <div className="card-kind">
-                          <Icon icon={info.icon} size={18} />
-                          {info.label}
-                        </div>
-                        {!account.isActive && <span className="badge">해지</span>}
-                      </div>
-                      <div className="card-title" title={account.name}>
-                        {account.name}
-                      </div>
-                      <div className="card-subtitle">
-                        {account.bank}
-                        {account.numberTail && ` · ${account.numberTail}`}
-                      </div>
-                      {balance && (
-                        <div className="card-balance">
-                          {balance.balance === null ? (
-                            <span className="muted">잔액 미입력</span>
-                          ) : (
-                            <>
-                              <div className="balance-value">
-                                <span>잔액</span>
-                                <strong className={balance.balance < 0 ? 'negative' : ''}>
-                                  {money(balance.balance)}
-                                </strong>
-                              </div>
-                              <span className="balance-base">{balance.baseDate} 보정 기준</span>
-                            </>
+      {loaded &&
+        (shown.length === 0 ? (
+          <Entrance order={entranceIndex++}>
+            <EmptyState
+              kind="accounts"
+              title="등록된 계좌가 없습니다"
+              description="계좌를 추가해 용도별로 정리해 보세요."
+              action={<AddButton onClick={() => setEditing('add')}>계좌 추가</AddButton>}
+            />
+          </Entrance>
+        ) : (
+          groups.map((group) => {
+            const members = shown.filter((account) => account.purposeId === group.id)
+            if (!members.length) return null
+            return (
+              <section className="section" key={group.id ?? 'none'}>
+                <Entrance order={entranceIndex++}>
+                  <h2>
+                    {group.color && (
+                      <span className="color-dot" style={{ backgroundColor: group.color }} />
+                    )}
+                    <span className="purpose-heading-name">{group.label}</span>
+                    <PurposeAmountLabel value={amounts.find((row) => row.purposeId === group.id)} />
+                  </h2>
+                </Entrance>
+                <div className="card-grid">
+                  {members.map((account) => {
+                    const info = ACCOUNT_INFO[account.type]
+                    const balance = balances.find((row) => row.accountId === account.id)
+                    return (
+                      <Entrance order={entranceIndex++} wrap key={account.id}>
+                        <article
+                          id={`account-${account.id}`}
+
+                          className={`item-card ${!account.isActive ? 'inactive' : ''} ${target?.kind === 'account' && target.id === account.id ? 'highlighted' : ''}`}
+                        >
+                          <div className="card-top">
+                            <div className="card-kind">
+                              <Icon icon={info.icon} size={18} />
+                              {info.label}
+                            </div>
+                            {!account.isActive && <span className="badge">해지</span>}
+                          </div>
+                          <div className="card-title" title={account.name}>
+                            {account.name}
+                          </div>
+                          <div className="card-subtitle">
+                            {account.bank}
+                            {account.numberTail && ` · ${account.numberTail}`}
+                          </div>
+                          {balance && (
+                            <div className="card-balance">
+                              {balance.balance === null ? (
+                                <span className="muted">잔액 미입력</span>
+                              ) : (
+                                <>
+                                  <div className="balance-value">
+                                    <span>잔액</span>
+                                    <strong className={balance.balance < 0 ? 'negative' : ''}>
+                                      {money(balance.balance)}
+                                    </strong>
+                                  </div>
+                                  <span className="balance-base">{balance.baseDate} 보정 기준</span>
+                                </>
+                              )}
+                            </div>
                           )}
-                        </div>
-                      )}
-                      {group.color && (
-                        <div className="card-purpose">
-                          <span className="color-dot" style={{ backgroundColor: group.color }} />
-                          {group.label}
-                        </div>
-                      )}
-                      {account.savings && (
-                        <div className="card-details">
-                          {account.monthlyContribution > 0 && (
-                            <span>월 납입 {money(account.monthlyContribution)}</span>
+                          {group.color && (
+                            <div className="card-purpose">
+                              <span
+                                className="color-dot"
+                                style={{ backgroundColor: group.color }}
+                              />
+                              {group.label}
+                            </div>
                           )}
-                          <span>연 {account.savings.interestRate}%</span>
-                          <span>{account.savings.maturityDate}</span>
-                          {account.savings.targetAmount !== null && (
-                            <span>{money(account.savings.targetAmount)}</span>
+                          {account.savings && (
+                            <div className="card-details">
+                              {account.monthlyContribution > 0 && (
+                                <span>월 납입 {money(account.monthlyContribution)}</span>
+                              )}
+                              <span>연 {account.savings.interestRate}%</span>
+                              <span>{account.savings.maturityDate}</span>
+                              {account.savings.targetAmount !== null && (
+                                <span>{money(account.savings.targetAmount)}</span>
+                              )}
+                            </div>
                           )}
-                        </div>
-                      )}
-                      <div className="card-actions">
-                        {account.isActive ? (
-                          <>
-                            <Button icon={Pencil} onClick={() => setEditing(account)}>
-                              수정
-                            </Button>
-                            <Button icon={Ban} onClick={() => setClosing(account)}>
-                              해지
-                            </Button>
-                            <Button icon={SlidersHorizontal} onClick={() => setBalancing(account)}>
-                              {balance?.balance == null ? '잔액 입력' : '잔액 보정'}
-                            </Button>
-                          </>
-                        ) : (
-                          <Button icon={RotateCcw} onClick={() => restore(account.id)}>
-                            복구
-                          </Button>
-                        )}
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
-            </section>
-          )
-        })
-      )}
+                          <div className="card-actions">
+                            {account.isActive ? (
+                              <>
+                                <Button icon={Pencil} onClick={() => setEditing(account)}>
+                                  수정
+                                </Button>
+                                <Button icon={Ban} onClick={() => setClosing(account)}>
+                                  해지
+                                </Button>
+                                <Button
+                                  icon={SlidersHorizontal}
+                                  onClick={() => setBalancing(account)}
+                                >
+                                  {balance?.balance == null ? '잔액 입력' : '잔액 보정'}
+                                </Button>
+                              </>
+                            ) : (
+                              <Button icon={RotateCcw} onClick={() => restore(account.id)}>
+                                복구
+                              </Button>
+                            )}
+                          </div>
+                        </article>
+                      </Entrance>
+                    )
+                  })}
+                </div>
+              </section>
+            )
+          })
+        ))}
       {editing && (
         <AccountForm
           account={editing === 'add' ? null : editing}

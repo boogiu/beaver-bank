@@ -1,3 +1,4 @@
+import { Entrance } from '../components/Entrance'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Ban, Pencil, RotateCcw, Trash2 } from 'lucide-react'
 import type {
@@ -360,6 +361,7 @@ function EndForm({
 }
 
 export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX.Element {
+  const [loaded, setLoaded] = useState(false)
   const [flows, setFlows] = useState<Flow[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [cards, setCards] = useState<Card[]>([])
@@ -378,6 +380,8 @@ export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX
   }))
   const [monthly, setMonthly] = useState<MonthlyFlows | null>(null)
   const [monthlyRevision, setMonthlyRevision] = useState(0)
+  const [viewVersion, setViewVersion] = useState(0)
+  const [monthVersion, setMonthVersion] = useState(0)
   const [occurrence, setOccurrence] = useState<Occurrence | null>(null)
   const targetRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -411,6 +415,7 @@ export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX
     else setError(cardResult.error.message)
     if (purposeResult.ok) setPurposes(purposeResult.data)
     else setError(purposeResult.error.message)
+    if (flowResult.ok && accountResult.ok && cardResult.ok && purposeResult.ok) setLoaded(true)
     setMonthlyRevision((value) => value + 1)
   }
   useEffect(() => {
@@ -428,6 +433,7 @@ export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX
       else setError(cardResult.error.message)
       if (purposeResult.ok) setPurposes(purposeResult.data)
       else setError(purposeResult.error.message)
+      if (flowResult.ok && accountResult.ok && cardResult.ok && purposeResult.ok) setLoaded(true)
     })
   }, [])
   const saved = (): void => {
@@ -448,6 +454,7 @@ export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX
       void refresh()
     } else setError(result.error.message)
   }
+  let entranceIndex = viewVersion === 0 ? 1 : 0
   const shown = flows.filter((flow) => showEnded || flow.status !== 'ended')
   const order = (a: Flow, b: Flow): number =>
     (a.cycle === 'monthly' ? 0 : 1) - (b.cycle === 'monthly' ? 0 : 1) ||
@@ -463,141 +470,167 @@ export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX
     )
   return (
     <>
-      <header className="page-head">
-        <div>
-          <h1>흐름</h1>
-          <p>반복되는 돈의 움직임을 관리합니다.</p>
-        </div>
-        <div className="page-actions">
-          <div className="view-switch" role="group" aria-label="흐름 보기 선택">
-            <Button
-              variant={view === 'monthly' ? 'primary' : undefined}
-              onClick={() => {
-                setView('monthly')
-                clearTarget()
-              }}
-            >
-              월별 보기
-            </Button>
-            <Button
-              variant={view === 'flows' ? 'primary' : undefined}
-              onClick={() => {
-                setView('flows')
-                clearTarget()
-              }}
-            >
-              흐름 보기
-            </Button>
+      <Entrance order={0}>
+        <header className="page-head">
+          <div>
+            <h1>흐름</h1>
+            <p>반복되는 돈의 움직임을 관리합니다.</p>
           </div>
-          {view === 'flows' && (
-            <Switch label="종료한 흐름 보기" checked={showEnded} onChange={setShowEnded} />
-          )}
-          <AddButton
-            disabled={!accounts.some((account) => account.isActive)}
-            onClick={() => setEditing('add')}
-          >
-            흐름 추가
-          </AddButton>
-        </div>
-      </header>
+          <div className="page-actions">
+            <div className="view-switch" role="group" aria-label="흐름 보기 선택">
+              <Button
+                variant={view === 'monthly' ? 'primary' : undefined}
+                onClick={() => {
+                  if (view !== 'monthly') {
+                    setViewVersion((value) => value + 1)
+                    setMonthVersion(0)
+                  }
+                  setView('monthly')
+                  clearTarget()
+                }}
+              >
+                월별 보기
+              </Button>
+              <Button
+                variant={view === 'flows' ? 'primary' : undefined}
+                onClick={() => {
+                  if (view !== 'flows') {
+                    setViewVersion((value) => value + 1)
+                    setMonthVersion(0)
+                  }
+                  setView('flows')
+                  clearTarget()
+                }}
+              >
+                흐름 보기
+              </Button>
+            </div>
+            {view === 'flows' && (
+              <Switch label="종료한 흐름 보기" checked={showEnded} onChange={setShowEnded} />
+            )}
+            <AddButton
+              disabled={!accounts.some((account) => account.isActive)}
+              onClick={() => setEditing('add')}
+            >
+              흐름 추가
+            </AddButton>
+          </div>
+        </header>
+      </Entrance>
       {error && <p className="error-banner">{error}</p>}
-      {view === 'monthly' ? (
-        <MonthlyFlowsView
-          month={month}
-          monthly={monthly}
-          flows={flows}
-          accounts={accounts}
-          onMonthChange={setMonth}
-          onAdd={() => setEditing('add')}
-          onOpen={setOccurrence}
-        />
-      ) : !accounts.some((account) => account.isActive) ? (
-        <EmptyState
-          kind="accounts"
-          title="사용 중인 계좌가 없습니다"
-          description="계좌를 먼저 추가해 주세요."
-        />
-      ) : shown.length === 0 ? (
-        <EmptyState
-          kind="accounts"
-          title="표시할 흐름이 없습니다"
-          description="정기 흐름을 추가해 보세요."
-          action={<AddButton onClick={() => setEditing('add')}>흐름 추가</AddButton>}
-        />
-      ) : (
-        (['income', 'transfer', 'payment'] as FlowKind[]).map((kind) => {
-          const members = shown.filter((flow) => flow.kind === kind).sort(order)
-          if (!members.length) return null
-          return (
-            <section className="section" key={kind}>
-              <h2>
-                <Icon icon={FLOW_INFO[kind].icon} size={18} />
-                {FLOW_INFO[kind].label}
-              </h2>
-              <div className="flow-list">
-                {members.map((flow) => (
-                  <article
-                    ref={target?.kind === 'flow' && target.id === flow.id ? targetRef : undefined}
-                    className={`item-card flow-card ${flow.status === 'ended' ? 'inactive' : ''} ${target?.kind === 'flow' && target.id === flow.id ? 'highlighted' : ''}`}
-                    key={flow.id}
-                  >
-                    <div className="flow-main">
-                      <div className="flow-ident">
-                        <Icon icon={FLOW_INFO[flow.kind].icon} size={18} />
-                        <strong className="flow-name" title={flow.name}>
-                          {flow.name}
-                        </strong>
-                        <span className="muted">{FLOW_CATEGORY[flow.category]}</span>
-                        {flow.isVariable && <span className="badge">변동</span>}
-                        {flow.status === 'scheduled' && <span className="badge">예정</span>}
-                        {flow.status === 'ended' && <span className="badge">종료</span>}
-                      </div>
-                      <div className="flow-amount">{money(flow.amount)}</div>
-                    </div>
-                    <div className="flow-meta">
-                      <span>
-                        {flow.cycle === 'monthly'
-                          ? `매월 ${flow.day}일`
-                          : `매년 ${flow.month}월 ${flow.day}일`}
-                      </span>
-                      {flow.fromAccount && <span>{accountText(flow.fromAccount)}</span>}
-                      {flow.kind === 'transfer' && <Icon icon={ArrowRight} size={18} />}
-                      {flow.toAccount && <span>{accountText(flow.toAccount)}</span>}
-                      {flow.card && (
-                        <span>
-                          · {flow.card.name}
-                          {!flow.card.isActive && <span className="badge">해지</span>}
-                        </span>
-                      )}
-                      {flow.startDate > today() && <span>{flow.startDate}부터</span>}
-                      {flow.endDate && <span>{flow.endDate}까지</span>}
-                    </div>
-                    <div className="card-actions">
-                      {flow.status === 'ended' ? (
-                        <Button icon={RotateCcw} onClick={() => void resume(flow)}>
-                          종료 취소
-                        </Button>
-                      ) : (
-                        <>
-                          <Button icon={Pencil} onClick={() => setEditing(flow)}>
-                            수정
+      {loaded &&
+        (view === 'monthly' ? (
+          <MonthlyFlowsView
+            month={month}
+            monthly={monthly}
+            flows={flows}
+            accounts={accounts}
+            entranceStart={viewVersion === 0 ? 1 : 0}
+            monthVersion={monthVersion}
+            onMonthChange={(next) => {
+              if (next.year === month.year && next.month === month.month) return
+              setMonth(next)
+              setMonthVersion((value) => value + 1)
+            }}
+            onAdd={() => setEditing('add')}
+            onOpen={setOccurrence}
+          />
+        ) : !accounts.some((account) => account.isActive) ? (
+          <Entrance order={entranceIndex++}>
+            <EmptyState
+              kind="accounts"
+              title="사용 중인 계좌가 없습니다"
+              description="계좌를 먼저 추가해 주세요."
+            />
+          </Entrance>
+        ) : shown.length === 0 ? (
+          <Entrance order={entranceIndex++}>
+            <EmptyState
+              kind="accounts"
+              title="표시할 흐름이 없습니다"
+              description="정기 흐름을 추가해 보세요."
+              action={<AddButton onClick={() => setEditing('add')}>흐름 추가</AddButton>}
+            />
+          </Entrance>
+        ) : (
+          (['income', 'transfer', 'payment'] as FlowKind[]).map((kind) => {
+            const members = shown.filter((flow) => flow.kind === kind).sort(order)
+            if (!members.length) return null
+            return (
+              <section className="section" key={kind}>
+                <Entrance order={entranceIndex++}>
+                  <h2>
+                    <Icon icon={FLOW_INFO[kind].icon} size={18} />
+                    {FLOW_INFO[kind].label}
+                  </h2>
+                </Entrance>
+                <div className="flow-list">
+                  {members.map((flow) => (
+                    <Entrance order={entranceIndex++} wrap key={flow.id}>
+                      <article
+                        ref={
+                          target?.kind === 'flow' && target.id === flow.id ? targetRef : undefined
+                        }
+                        className={`item-card flow-card ${flow.status === 'ended' ? 'inactive' : ''} ${target?.kind === 'flow' && target.id === flow.id ? 'highlighted' : ''}`}
+                      >
+                        <div className="flow-main">
+                          <div className="flow-ident">
+                            <Icon icon={FLOW_INFO[flow.kind].icon} size={18} />
+                            <strong className="flow-name" title={flow.name}>
+                              {flow.name}
+                            </strong>
+                            <span className="muted">{FLOW_CATEGORY[flow.category]}</span>
+                            {flow.isVariable && <span className="badge">변동</span>}
+                            {flow.status === 'scheduled' && <span className="badge">예정</span>}
+                            {flow.status === 'ended' && <span className="badge">종료</span>}
+                          </div>
+                          <div className="flow-amount">{money(flow.amount)}</div>
+                        </div>
+                        <div className="flow-meta">
+                          <span>
+                            {flow.cycle === 'monthly'
+                              ? `매월 ${flow.day}일`
+                              : `매년 ${flow.month}월 ${flow.day}일`}
+                          </span>
+                          {flow.fromAccount && <span>{accountText(flow.fromAccount)}</span>}
+                          {flow.kind === 'transfer' && <Icon icon={ArrowRight} size={18} />}
+                          {flow.toAccount && <span>{accountText(flow.toAccount)}</span>}
+                          {flow.card && (
+                            <span>
+                              · {flow.card.name}
+                              {!flow.card.isActive && <span className="badge">해지</span>}
+                            </span>
+                          )}
+                          {flow.startDate > today() && <span>{flow.startDate}부터</span>}
+                          {flow.endDate && <span>{flow.endDate}까지</span>}
+                        </div>
+                        <div className="card-actions">
+                          {flow.status === 'ended' ? (
+                            <Button icon={RotateCcw} onClick={() => void resume(flow)}>
+                              종료 취소
+                            </Button>
+                          ) : (
+                            <>
+                              <Button icon={Pencil} onClick={() => setEditing(flow)}>
+                                수정
+                              </Button>
+                              <Button icon={Ban} onClick={() => setEnding(flow)}>
+                                종료
+                              </Button>
+                            </>
+                          )}
+                          <Button icon={Trash2} onClick={() => setDeleting(flow)}>
+                            삭제
                           </Button>
-                          <Button icon={Ban} onClick={() => setEnding(flow)}>
-                            종료
-                          </Button>
-                        </>
-                      )}
-                      <Button icon={Trash2} onClick={() => setDeleting(flow)}>
-                        삭제
-                      </Button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          )
-        })
-      )}
+                        </div>
+                      </article>
+                    </Entrance>
+                  ))}
+                </div>
+              </section>
+            )
+          })
+        ))}
       {editing && (
         <FlowForm
           flow={editing === 'add' ? null : editing}

@@ -1,9 +1,36 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ChevronDown, X } from 'lucide-react'
 import type { ApiError } from '@shared/ipc'
 import type { LucideIcon } from 'lucide-react'
 import { Button, Icon } from './Ui'
+import { getReducedMotion } from '../hooks/useReducedMotion'
+
+// 호출부는 닫는 즉시 기능과 상태를 끝낸다. 남기는 복제는 입력·역할 없는 모습뿐이다.
+function leaveAppearance(backdrop: HTMLElement): void {
+  if (getReducedMotion()) return
+  const copy = backdrop.cloneNode(true) as HTMLElement
+  const originals = backdrop.querySelectorAll<HTMLElement>('*')
+  const copies = copy.querySelectorAll<HTMLElement>('*')
+  copies.forEach((element, index) => {
+    const original = originals[index]
+    element.removeAttribute('id')
+    element.removeAttribute('role')
+    element.removeAttribute('aria-modal')
+    element.removeAttribute('autofocus')
+    element.scrollTop = original.scrollTop
+    if (element instanceof HTMLInputElement && original instanceof HTMLInputElement) {
+      element.value = original.value
+      element.checked = original.checked
+    } else if (element instanceof HTMLTextAreaElement && original instanceof HTMLTextAreaElement)
+      element.value = original.value
+  })
+  copy.classList.add('modal-leaving')
+  copy.setAttribute('aria-hidden', 'true')
+  copy.inert = true
+  document.body.append(copy)
+  window.setTimeout(() => copy.remove(), 200)
+}
 
 export function Modal({
   title,
@@ -17,40 +44,59 @@ export function Modal({
   title: string
   children: ReactNode
   onClose: () => void
-  onSubmit: () => void
+  onSubmit: () => void | Promise<void>
   submitLabel?: string
   error?: ApiError | null
   small?: boolean
 }): React.JSX.Element {
   const modal = useRef<HTMLDivElement>(null)
-  useEffect(() => {
+  const active = useRef(true)
+  const submitting = useRef(false)
+  const close = useCallback((): void => {
+    if (!active.current) return
+    active.current = false
+    modal.current?.removeAttribute('role')
+    onClose()
+  }, [onClose])
+  const submit = useCallback((): void => {
+    if (!active.current || submitting.current) return
+    submitting.current = true
+    void Promise.resolve(onSubmit()).finally(() => {
+      submitting.current = false
+    })
+  }, [onSubmit])
+  useLayoutEffect(() => {
+    active.current = true
+    const backdrop = modal.current?.parentElement
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const first = modal.current?.querySelector<HTMLElement>(
       'input, textarea, .custom-select-button, button:not(.close-button)'
     )
     first?.focus()
     return () => {
+      active.current = false
+      if (backdrop) leaveAppearance(backdrop)
       if (previous?.isConnected) previous.focus()
     }
   }, [])
   useEffect(() => {
     if (!error?.field) return
     const field = modal.current?.querySelector<HTMLElement>(`[data-field="${error.field}"]`)
-    field?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    field?.scrollIntoView({ block: 'nearest', behavior: getReducedMotion() ? 'instant' : 'smooth' })
     field?.querySelector<HTMLElement>('input, textarea, button')?.focus()
   }, [error])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const dialogs = document.querySelectorAll('[role="dialog"]')
-      if (dialogs[dialogs.length - 1] !== modal.current || event.isComposing) return
+      if (!active.current || dialogs[dialogs.length - 1] !== modal.current || event.isComposing) return
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        close()
       }
       if (event.key === 'Enter' && !(event.target instanceof HTMLTextAreaElement)) {
         event.preventDefault()
         if (event.target instanceof Element && event.target.closest('[data-enter-inert]')) return
-        onSubmit()
+        submit()
       }
       if (event.key === 'Tab') {
         const focusable = [
@@ -73,7 +119,7 @@ export function Modal({
     }
     document.addEventListener('keydown', onKeyDown, true)
     return () => document.removeEventListener('keydown', onKeyDown, true)
-  }, [onClose, onSubmit])
+  }, [close, submit])
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.stopPropagation()}>
       <div
@@ -85,7 +131,7 @@ export function Modal({
       >
         <div className="modal-head">
           <h2>{title}</h2>
-          <button className="button icon-button close-button" aria-label="닫기" onClick={onClose}>
+          <button className="button icon-button close-button" aria-label="닫기" onClick={close}>
             <Icon icon={X} size={16} />
           </button>
         </div>
@@ -94,8 +140,8 @@ export function Modal({
           {error && !error.field && <p className="error-banner">{error.message}</p>}
         </div>
         <div className="modal-foot">
-          <Button onClick={onClose}>취소</Button>
-          <Button variant="primary" onClick={onSubmit}>
+          <Button onClick={close}>취소</Button>
+          <Button variant="primary" onClick={submit}>
             {submitLabel}
           </Button>
         </div>
@@ -114,7 +160,7 @@ export function ConfirmModal({
   title: string
   message: ReactNode
   onClose: () => void
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
   confirmLabel?: string
 }): React.JSX.Element {
   return (

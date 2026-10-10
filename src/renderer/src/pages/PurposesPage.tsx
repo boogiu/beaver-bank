@@ -1,3 +1,4 @@
+import { Entrance } from '../components/Entrance'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
 import type { ApiError, Purpose, PurposeAmount } from '@shared/ipc'
@@ -82,6 +83,9 @@ function PurposeForm({
 }
 
 export default function PurposesPage({ target }: PageProps): React.JSX.Element {
+  let entranceIndex = 0
+
+  const [loaded, setLoaded] = useState(false)
   const [items, setItems] = useState<Purpose[]>([])
   const [amounts, setAmounts] = useState<PurposeAmount[]>([])
   const [editing, setEditing] = useState<Purpose | null | 'add'>(null)
@@ -97,6 +101,7 @@ export default function PurposesPage({ target }: PageProps): React.JSX.Element {
     else setError(result.error.message)
     if (amountResult.ok) setAmounts(amountResult.data)
     else setError(amountResult.error.message)
+    if (result.ok && amountResult.ok) setLoaded(true)
   }, [])
   useEffect(() => {
     void Promise.resolve().then(refresh)
@@ -129,65 +134,72 @@ export default function PurposesPage({ target }: PageProps): React.JSX.Element {
   }
   return (
     <>
-      <header className="page-head">
-        <div>
-          <h1>용도</h1>
-          <p>돈의 쓰임새를 나눕니다.</p>
-        </div>
-        <AddButton onClick={() => setEditing('add')}>용도 추가</AddButton>
-      </header>
+      <Entrance order={entranceIndex++}>
+        <header className="page-head">
+          <div>
+            <h1>용도</h1>
+            <p>돈의 쓰임새를 나눕니다.</p>
+          </div>
+          <AddButton onClick={() => setEditing('add')}>용도 추가</AddButton>
+        </header>
+      </Entrance>
       {error && <p className="error-banner">{error}</p>}
-      {items.length === 0 ? (
-        <EmptyState
-          kind="purposes"
-          title="등록된 용도가 없습니다"
-          description="첫 용도를 추가해 보세요."
-          action={<AddButton onClick={() => setEditing('add')}>용도 추가</AddButton>}
-        />
-      ) : (
-        <div className="purpose-list">
-          {items.map((item) => (
-            <div
-              id={`purpose-${item.id}`}
-              key={item.id}
-              className={`purpose-row ${target?.kind === 'purpose' && target.id === item.id ? 'highlighted' : ''}`}
-              draggable
-              onDragStart={(event) => {
-                dragged.current = item.id
-                event.dataTransfer.effectAllowed = 'move'
-              }}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault()
-                void drop(item.id)
-              }}
-              onDragEnd={() => {
-                dragged.current = null
-              }}
-            >
-              <Icon icon={GripVertical} size={16} />
-              <span className="color-dot" style={{ backgroundColor: item.color }} />
-              <span className="purpose-name">{item.name}</span>
-              <PurposeAmountLabel value={amounts.find((row) => row.purposeId === item.id)} />
-              <Button
-                icon={Pencil}
-                aria-label={`${item.name} 수정`}
-                onClick={() => setEditing(item)}
-              >
-                수정
-              </Button>
-              <Button
-                icon={Trash2}
-                variant="danger"
-                aria-label={`${item.name} 삭제`}
-                onClick={() => setRemoving(item)}
-              >
-                삭제
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
+      {loaded &&
+        (items.length === 0 ? (
+          <Entrance order={entranceIndex++}>
+            <EmptyState
+              kind="purposes"
+              title="등록된 용도가 없습니다"
+              description="첫 용도를 추가해 보세요."
+              action={<AddButton onClick={() => setEditing('add')}>용도 추가</AddButton>}
+            />
+          </Entrance>
+        ) : (
+          <div className="purpose-list">
+            {items.map((item) => (
+              <Entrance order={entranceIndex++} wrap key={item.id}>
+                <div
+                  id={`purpose-${item.id}`}
+
+                  className={`purpose-row ${target?.kind === 'purpose' && target.id === item.id ? 'highlighted' : ''}`}
+                  draggable
+                  onDragStart={(event) => {
+                    dragged.current = item.id
+                    event.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    void drop(item.id)
+                  }}
+                  onDragEnd={() => {
+                    dragged.current = null
+                  }}
+                >
+                  <Icon icon={GripVertical} size={16} />
+                  <span className="color-dot" style={{ backgroundColor: item.color }} />
+                  <span className="purpose-name">{item.name}</span>
+                  <PurposeAmountLabel value={amounts.find((row) => row.purposeId === item.id)} />
+                  <Button
+                    icon={Pencil}
+                    aria-label={`${item.name} 수정`}
+                    onClick={() => setEditing(item)}
+                  >
+                    수정
+                  </Button>
+                  <Button
+                    icon={Trash2}
+                    variant="danger"
+                    aria-label={`${item.name} 삭제`}
+                    onClick={() => setRemoving(item)}
+                  >
+                    삭제
+                  </Button>
+                </div>
+              </Entrance>
+            ))}
+          </div>
+        ))}
       {editing && (
         <PurposeForm
           value={editing === 'add' ? null : editing}

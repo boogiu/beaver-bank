@@ -1,3 +1,4 @@
+import { Entrance } from '../components/Entrance'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from 'd3-force'
 import type { Simulation, SimulationLinkDatum, SimulationNodeDatum } from 'd3-force'
@@ -161,6 +162,9 @@ function makeGraph(
 }
 
 export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
+  let entranceIndex = 0
+
+  const [loaded, setLoaded] = useState(false)
   const [purposes, setPurposes] = useState<Purpose[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [cards, setCards] = useState<Card[]>([])
@@ -190,6 +194,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
           setAccounts(a.data)
           setCards(c.data)
           setFlows(f.data)
+          setLoaded(true)
         } else setError('그래프 데이터를 읽지 못했습니다.')
       })
       .catch(() => setError('그래프 데이터를 읽지 못했습니다.'))
@@ -375,208 +380,218 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
   }
   return (
     <>
-      <header className="page-head graph-head">
-        <div>
-          <h1>그래프</h1>
-          <p>용도와 계좌, 카드, 흐름의 연결을 봅니다.</p>
-        </div>
-        <div className="page-actions">
-          <Switch label="해지 항목 보기" checked={showInactive} onChange={setShowInactive} />
-          <Button icon={Scan} onClick={() => fit(model.current)}>
-            화면에 맞추기
-          </Button>
-        </div>
-      </header>
-      {error && <p className="error-banner">{error}</p>}
-      {graph.nodes.length === 0 ? (
-        <EmptyState
-          kind="graph"
-          title="표시할 항목이 없습니다"
-          description="용도, 계좌 또는 카드를 추가해 보세요."
-        />
-      ) : (
-        <div
-          className="graph-region panel"
-          ref={region}
-          onWheel={(event) => {
-            const rect = region.current!.getBoundingClientRect()
-            const x = event.clientX - rect.left,
-              y = event.clientY - rect.top
-            const scale = Math.max(
-              0.3,
-              Math.min(3, view.scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15))
-            )
-            setView({
-              scale,
-              x: x - ((x - view.x) * scale) / view.scale,
-              y: y - ((y - view.y) * scale) / view.scale
-            })
-          }}
-        >
-          <svg
-            className="graph-svg"
-            width="100%"
-            height="100%"
-            onPointerDown={(event) => {
-              if (event.target !== event.currentTarget) return
-              event.currentTarget.setPointerCapture(event.pointerId)
-              pan.current = { x: event.clientX, y: event.clientY, tx: view.x, ty: view.y }
-            }}
-            onPointerMove={(event) => {
-              const current = pan.current
-              const x = event.clientX
-              const y = event.clientY
-              if (current)
-                setView((old) => ({
-                  ...old,
-                  x: current.tx + x - current.x,
-                  y: current.ty + y - current.y
-                }))
-            }}
-            onPointerUp={(event) => {
-              pan.current = null
-              if (event.currentTarget.hasPointerCapture(event.pointerId))
-                event.currentTarget.releasePointerCapture(event.pointerId)
-            }}
-          >
-            <defs>
-              <marker
-                id="graph-arrow-focus"
-                markerWidth="8"
-                markerHeight="8"
-                refX="7"
-                refY="4"
-                orient="auto-start-reverse"
-                markerUnits="userSpaceOnUse"
-              >
-                <path d="M0,0 L8,4 L0,8 Z" fill="var(--focus)" />
-              </marker>
-              <marker
-                id="graph-arrow-amber"
-                markerWidth="8"
-                markerHeight="8"
-                refX="7"
-                refY="4"
-                orient="auto"
-                markerUnits="userSpaceOnUse"
-              >
-                <path d="M0,0 L8,4 L0,8 Z" fill="var(--amber)" />
-              </marker>
-            </defs>
-            <g transform={`translate(${view.x},${view.y}) scale(${view.scale})`}>
-              {links.map((link, index) => {
-                const a = byId.get(link.source),
-                  b = byId.get(link.target)
-                if (!a || !b) return null
-                const dx = (b.x ?? 0) - (a.x ?? 0),
-                  dy = (b.y ?? 0) - (a.y ?? 0)
-                const distance = Math.hypot(dx, dy) || 1
-                const ux = dx / distance,
-                  uy = dy / distance
-                const directed = ['income-account', 'account-transfer', 'account-payment'].includes(
-                  link.kind
-                )
-                return (
-                  <line
-                    key={index}
-                    className="graph-link"
-                    data-kind={link.kind}
-                    data-source={link.source}
-                    data-target={link.target}
-                    markerEnd={
-                      directed
-                        ? `url(#graph-arrow-${link.kind === 'account-payment' ? 'amber' : 'focus'})`
-                        : undefined
-                    }
-                    markerStart={link.reverse ? 'url(#graph-arrow-focus)' : undefined}
-                    style={{
-                      opacity: hovered
-                        ? link.source === hovered || link.target === hovered
-                          ? 1
-                          : 0.15
-                        : 0.5,
-                      stroke:
-                        link.kind === 'account-payment'
-                          ? 'var(--amber)'
-                          : ['income-account', 'account-transfer'].includes(link.kind)
-                            ? 'var(--focus)'
-                            : 'var(--muted)'
-                    }}
-                    x1={(a.x ?? 0) + ux * (radius(a) + (link.reverse ? 6 : 0))}
-                    y1={(a.y ?? 0) + uy * (radius(a) + (link.reverse ? 6 : 0))}
-                    x2={(b.x ?? 0) - ux * (radius(b) + (directed ? 6 : 0))}
-                    y2={(b.y ?? 0) - uy * (radius(b) + (directed ? 6 : 0))}
-                  />
-                )
-              })}
-              {positions.map((node) => {
-                const shape = NODE_TYPES.find((type) => type.kind === node.kind)!.shape
-                return (
-                  <g
-                    key={node.id}
-                    className={`graph-node ${node.inactive ? 'inactive' : ''}`}
-                    transform={`translate(${node.x},${node.y})`}
-                    style={{
-                      opacity: hovered && !connected.has(node.id) ? 0.22 : node.inactive ? 0.58 : 1
-                    }}
-                    onPointerEnter={() => setHovered(node.id)}
-                    onPointerLeave={() => setHovered(null)}
-                    onPointerDown={(event) => nodeDown(event, node)}
-                    onPointerMove={(event) => nodeMove(event, node)}
-                    onPointerUp={(event) => nodeUp(event, node)}
-                  >
-                    {shape === 'rounded-rectangle' ? (
-                      <rect x={-24} y={-16} width={48} height={32} rx={6} fill={node.color} />
-                    ) : shape === 'diamond' ? (
-                      <path d="M0,-17 L17,0 L0,17 L-17,0 Z" fill={node.color} />
-                    ) : shape === 'triangle' ? (
-                      <path d="M0,-18 L18,15 L-18,15 Z" fill={node.color} />
-                    ) : (
-                      <circle r={shape === 'large-circle' ? 28 : 20} fill={node.color} />
-                    )}
-                    <text
-                      className="graph-label"
-                      y={radius(node) + 18}
-                      textAnchor="middle"
-                      style={{
-                        fill: hovered && connected.has(node.id) ? 'var(--text)' : 'var(--muted)'
-                      }}
-                    >
-                      {labelLines(node.name).map((line, index) => (
-                        <tspan key={index} x={0} dy={index === 0 ? 0 : 14}>
-                          {line}
-                        </tspan>
-                      ))}
-                    </text>
-                    {node.inactive && (
-                      <text className="graph-inactive" y={4} textAnchor="middle">
-                        해지
-                      </text>
-                    )}
-                    <title>{node.name}</title>
-                  </g>
-                )
-              })}
-            </g>
-          </svg>
-          <div className="graph-legend">
-            {NODE_TYPES.map((type) => (
-              <span key={type.kind}>
-                <i className={`legend-shape ${type.shape}`} />
-                {type.label}
-              </span>
-            ))}
-            <span>
-              <i className="legend-line focus" />
-              수입·이체
-            </span>
-            <span>
-              <i className="legend-line amber" />
-              정기 결제
-            </span>
+      <Entrance order={entranceIndex++}>
+        <header className="page-head graph-head">
+          <div>
+            <h1>그래프</h1>
+            <p>용도와 계좌, 카드, 흐름의 연결을 봅니다.</p>
           </div>
-        </div>
-      )}
+          <div className="page-actions">
+            <Switch label="해지 항목 보기" checked={showInactive} onChange={setShowInactive} />
+            <Button icon={Scan} onClick={() => fit(model.current)}>
+              화면에 맞추기
+            </Button>
+          </div>
+        </header>
+      </Entrance>
+      {error && <p className="error-banner">{error}</p>}
+      {loaded &&
+        (graph.nodes.length === 0 ? (
+          <Entrance order={entranceIndex++}>
+            <EmptyState
+              kind="graph"
+              title="표시할 항목이 없습니다"
+              description="용도, 계좌 또는 카드를 추가해 보세요."
+            />
+          </Entrance>
+        ) : (
+          <Entrance order={entranceIndex++}>
+            <div
+              className="graph-region panel"
+              ref={region}
+              onWheel={(event) => {
+                const rect = region.current!.getBoundingClientRect()
+                const x = event.clientX - rect.left,
+                  y = event.clientY - rect.top
+                const scale = Math.max(
+                  0.3,
+                  Math.min(3, view.scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15))
+                )
+                setView({
+                  scale,
+                  x: x - ((x - view.x) * scale) / view.scale,
+                  y: y - ((y - view.y) * scale) / view.scale
+                })
+              }}
+            >
+              <svg
+                className="graph-svg"
+                width="100%"
+                height="100%"
+                onPointerDown={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                  pan.current = { x: event.clientX, y: event.clientY, tx: view.x, ty: view.y }
+                }}
+                onPointerMove={(event) => {
+                  const current = pan.current
+                  const x = event.clientX
+                  const y = event.clientY
+                  if (current)
+                    setView((old) => ({
+                      ...old,
+                      x: current.tx + x - current.x,
+                      y: current.ty + y - current.y
+                    }))
+                }}
+                onPointerUp={(event) => {
+                  pan.current = null
+                  if (event.currentTarget.hasPointerCapture(event.pointerId))
+                    event.currentTarget.releasePointerCapture(event.pointerId)
+                }}
+              >
+                <defs>
+                  <marker
+                    id="graph-arrow-focus"
+                    markerWidth="8"
+                    markerHeight="8"
+                    refX="7"
+                    refY="4"
+                    orient="auto-start-reverse"
+                    markerUnits="userSpaceOnUse"
+                  >
+                    <path d="M0,0 L8,4 L0,8 Z" fill="var(--focus)" />
+                  </marker>
+                  <marker
+                    id="graph-arrow-amber"
+                    markerWidth="8"
+                    markerHeight="8"
+                    refX="7"
+                    refY="4"
+                    orient="auto"
+                    markerUnits="userSpaceOnUse"
+                  >
+                    <path d="M0,0 L8,4 L0,8 Z" fill="var(--amber)" />
+                  </marker>
+                </defs>
+                <g transform={`translate(${view.x},${view.y}) scale(${view.scale})`}>
+                  {links.map((link, index) => {
+                    const a = byId.get(link.source),
+                      b = byId.get(link.target)
+                    if (!a || !b) return null
+                    const dx = (b.x ?? 0) - (a.x ?? 0),
+                      dy = (b.y ?? 0) - (a.y ?? 0)
+                    const distance = Math.hypot(dx, dy) || 1
+                    const ux = dx / distance,
+                      uy = dy / distance
+                    const directed = [
+                      'income-account',
+                      'account-transfer',
+                      'account-payment'
+                    ].includes(link.kind)
+                    return (
+                      <line
+                        key={index}
+                        className="graph-link"
+                        data-kind={link.kind}
+                        data-source={link.source}
+                        data-target={link.target}
+                        markerEnd={
+                          directed
+                            ? `url(#graph-arrow-${link.kind === 'account-payment' ? 'amber' : 'focus'})`
+                            : undefined
+                        }
+                        markerStart={link.reverse ? 'url(#graph-arrow-focus)' : undefined}
+                        style={{
+                          opacity: hovered
+                            ? link.source === hovered || link.target === hovered
+                              ? 1
+                              : 0.15
+                            : 0.5,
+                          stroke:
+                            link.kind === 'account-payment'
+                              ? 'var(--amber)'
+                              : ['income-account', 'account-transfer'].includes(link.kind)
+                                ? 'var(--focus)'
+                                : 'var(--muted)'
+                        }}
+                        x1={(a.x ?? 0) + ux * (radius(a) + (link.reverse ? 6 : 0))}
+                        y1={(a.y ?? 0) + uy * (radius(a) + (link.reverse ? 6 : 0))}
+                        x2={(b.x ?? 0) - ux * (radius(b) + (directed ? 6 : 0))}
+                        y2={(b.y ?? 0) - uy * (radius(b) + (directed ? 6 : 0))}
+                      />
+                    )
+                  })}
+                  {positions.map((node) => {
+                    const shape = NODE_TYPES.find((type) => type.kind === node.kind)!.shape
+                    return (
+                      <g
+                        key={node.id}
+                        className={`graph-node ${node.inactive ? 'inactive' : ''}`}
+                        transform={`translate(${node.x},${node.y})`}
+                        style={{
+                          opacity:
+                            hovered && !connected.has(node.id) ? 0.22 : node.inactive ? 0.58 : 1
+                        }}
+                        onPointerEnter={() => setHovered(node.id)}
+                        onPointerLeave={() => setHovered(null)}
+                        onPointerDown={(event) => nodeDown(event, node)}
+                        onPointerMove={(event) => nodeMove(event, node)}
+                        onPointerUp={(event) => nodeUp(event, node)}
+                      >
+                        {shape === 'rounded-rectangle' ? (
+                          <rect x={-24} y={-16} width={48} height={32} rx={6} fill={node.color} />
+                        ) : shape === 'diamond' ? (
+                          <path d="M0,-17 L17,0 L0,17 L-17,0 Z" fill={node.color} />
+                        ) : shape === 'triangle' ? (
+                          <path d="M0,-18 L18,15 L-18,15 Z" fill={node.color} />
+                        ) : (
+                          <circle r={shape === 'large-circle' ? 28 : 20} fill={node.color} />
+                        )}
+                        <text
+                          className="graph-label"
+                          y={radius(node) + 18}
+                          textAnchor="middle"
+                          style={{
+                            fill: hovered && connected.has(node.id) ? 'var(--text)' : 'var(--muted)'
+                          }}
+                        >
+                          {labelLines(node.name).map((line, index) => (
+                            <tspan key={index} x={0} dy={index === 0 ? 0 : 14}>
+                              {line}
+                            </tspan>
+                          ))}
+                        </text>
+                        {node.inactive && (
+                          <text className="graph-inactive" y={4} textAnchor="middle">
+                            해지
+                          </text>
+                        )}
+                        <title>{node.name}</title>
+                      </g>
+                    )
+                  })}
+                </g>
+              </svg>
+              <div className="graph-legend">
+                {NODE_TYPES.map((type) => (
+                  <span key={type.kind}>
+                    <i className={`legend-shape ${type.shape}`} />
+                    {type.label}
+                  </span>
+                ))}
+                <span>
+                  <i className="legend-line focus" />
+                  수입·이체
+                </span>
+                <span>
+                  <i className="legend-line amber" />
+                  정기 결제
+                </span>
+              </div>
+            </div>
+          </Entrance>
+        ))}
     </>
   )
 }

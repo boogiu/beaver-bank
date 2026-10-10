@@ -5,6 +5,7 @@ import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { DashboardData } from '@shared/ipc'
 import { money } from './domain-ui'
+import { getReducedMotion } from '../hooks/useReducedMotion'
 
 registerCharts([LineChart, GridComponent, TooltipComponent, CanvasRenderer])
 
@@ -35,6 +36,7 @@ export default function DashboardTrend({
       const color = (token: string): string => styles.getPropertyValue(`--${token}`).trim()
       chart = init(element)
       chart.setOption({
+        animation: !getReducedMotion(),
         textStyle: { fontFamily: 'Pretendard', fontSize: 12 },
         grid: { left: 12, right: 24, top: 24, bottom: 12, containLabel: true },
         tooltip: {

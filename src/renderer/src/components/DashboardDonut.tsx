@@ -5,6 +5,7 @@ import { TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { DashboardData } from '@shared/ipc'
 import { money } from './domain-ui'
+import { getReducedMotion } from '../hooks/useReducedMotion'
 
 registerCharts([PieChart, TooltipComponent, CanvasRenderer])
 
@@ -26,6 +27,7 @@ export default function DashboardDonut({ items }: { items: Composition }): React
       const styles = getComputedStyle(element)
       chart = init(element)
       chart.setOption({
+        animation: !getReducedMotion(),
         textStyle: { fontFamily: 'Pretendard', fontSize: 14 },
         tooltip: {
           trigger: 'item',

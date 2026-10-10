@@ -19,7 +19,7 @@ BeaverBank는 여러 계좌(적금, 용도별 통장)와 매달 반복되는 돈
 |---|---|
 | 앱 | Electron + electron-vite |
 | 화면 | React + TypeScript + Tailwind CSS |
-| 효과 / 차트 | Motion, ECharts |
+| 효과 / 차트 | ECharts |
 | DB | SQLite (better-sqlite3) + Drizzle ORM |
 
 ## 개인정보 보호
@@ -27,6 +27,12 @@ BeaverBank는 여러 계좌(적금, 용도별 통장)와 매달 반복되는 돈
 - 모든 데이터는 로컬 SQLite 파일에만 저장되며, 저장 위치는 프로젝트 폴더 밖(`%APPDATA%\BeaverBank`)입니다.
 - DB 파일과 `.env`는 `.gitignore`로 커밋에서 제외됩니다.
 - 저장소의 샘플 데이터와 스크린샷은 모두 가짜 데이터입니다.
+
+## 데모 실행
+
+`npm run demo`를 실행하면 가짜 데이터가 채워진 앱을 띄울 수 있습니다.
+실제 DB와 개발 DB를 건드리지 않고, 별도 데이터 폴더 `%APPDATA%\BeaverBank-demo`만 사용합니다.
+실행할 때마다 데모 데이터는 처음 상태로 돌아갑니다.
 
 ## 로드맵
 

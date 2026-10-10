@@ -4,6 +4,10 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { closeDatabase, getDbStatus, openDatabase } from './db'
 import * as service from './db/service'
+import { configureDemo, resetDemoDatabase, seedDemo } from './demo'
+
+const demo = process.argv.includes('--demo')
+if (demo) configureDemo()
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -11,7 +15,7 @@ function createWindow(): void {
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    title: 'BeaverBank',
+    title: demo ? 'BeaverBank (데모)' : 'BeaverBank',
     backgroundColor: '#1E1E1E',
     show: false,
     autoHideMenuBar: true,
@@ -25,6 +29,7 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
+  if (demo) mainWindow.on('page-title-updated', (event) => event.preventDefault())
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -116,9 +121,14 @@ app.whenReady().then(() => {
   })
 
   try {
+    if (demo) resetDemoDatabase()
     openDatabase()
+    if (demo) seedDemo()
   } catch (error) {
-    dialog.showErrorBox('BeaverBank', `데이터베이스를 열지 못했습니다.\n\n${String(error)}`)
+    dialog.showErrorBox(
+      'BeaverBank',
+      `${demo ? '데모 데이터를 준비하지 못했습니다.' : '데이터베이스를 열지 못했습니다.'}\n\n${String(error)}`
+    )
     app.quit()
     return
   }

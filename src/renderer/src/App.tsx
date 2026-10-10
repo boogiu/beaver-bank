@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CreditCard, GitBranch, Info, Landmark, Tags, Repeat, LayoutDashboard } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import mascot from './assets/illustrations/M1-C-mascot-a2.png'
@@ -10,6 +10,8 @@ import GraphPage from './pages/GraphPage'
 import InfoPage from './pages/InfoPage'
 import FlowsPage from './pages/FlowsPage'
 import DashboardPage from './pages/DashboardPage'
+import { getReducedMotion } from './hooks/useReducedMotion'
+import { DamScene } from './components/DamScene'
 
 export type PageId = string
 export type NavigationTarget = {
@@ -42,6 +44,32 @@ const MENU: {
 function App(): React.JSX.Element {
   const [page, setPage] = useState<PageId>('dashboard')
   const [target, setTarget] = useState<NavigationTarget | null>(null)
+  const [hopping, setHopping] = useState(false)
+  const hopTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(hopTimer.current), [])
+  const hop = (): void => {
+    if (getReducedMotion() || hopping) return
+    setHopping(true)
+    hopTimer.current = window.setTimeout(() => setHopping(false), 400)
+  }
+  const menu = useRef<HTMLElement>(null)
+  const highlight = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const list = menu.current
+    const indicator = highlight.current
+    if (!list || !indicator) return
+    const measure = (): void => {
+      const current = list.querySelector<HTMLElement>('[aria-current="page"]')
+      if (!current) return
+      indicator.style.transition = getReducedMotion() ? 'none' : ''
+      indicator.style.height = `${current.offsetHeight}px`
+      indicator.style.transform = `translateY(${current.offsetTop}px)`
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(list)
+    return () => observer.disconnect()
+  }, [page])
   const navigate: PageProps['navigate'] = (next, item) => {
     setPage(next)
     setTarget(item ?? null)
@@ -52,10 +80,17 @@ function App(): React.JSX.Element {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <img src={mascot} alt="" />
+          <img
+            src={mascot}
+            alt=""
+            className={`mascot-motion ${hopping ? 'mascot-hop' : ''}`}
+            style={{ animationPlayState: hopping ? 'paused, running' : 'running' }}
+          />
+          <span className="mascot-hit" onMouseEnter={hop} aria-hidden="true" />
           <span>BeaverBank</span>
         </div>
-        <nav className="menu-list" aria-label="주 메뉴">
+        <nav className="menu-list" aria-label="주 메뉴" ref={menu}>
+          <div className="menu-highlight" ref={highlight} aria-hidden="true" />
           {MENU.map(({ id, label, icon }) => (
             <button
               key={id}
@@ -68,6 +103,7 @@ function App(): React.JSX.Element {
             </button>
           ))}
         </nav>
+        <DamScene />
       </aside>
       <main
         key={page}

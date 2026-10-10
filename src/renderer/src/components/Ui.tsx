@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Plus } from 'lucide-react'
 import type { PurposeAmount } from '@shared/ipc'
@@ -95,15 +95,21 @@ export function EmptyState({
   kind,
   title,
   description,
-  action
+  action,
+  className = '',
+  style,
+  'data-entrance': entrance
 }: {
   kind: keyof typeof emptyImages
   title: string
   description: string
   action?: ReactNode
+  className?: string
+  style?: CSSProperties
+  'data-entrance'?: boolean
 }): React.JSX.Element {
   return (
-    <div className="empty">
+    <div className={`empty ${className}`} style={style} data-entrance={entrance}>
       <img src={emptyImages[kind]} alt="" />
       <h2>{title}</h2>
       <p>{description}</p>

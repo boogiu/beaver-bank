@@ -1,3 +1,4 @@
+import { Entrance } from '../components/Entrance'
 import { useEffect, useState } from 'react'
 import { Ban, Pencil, RotateCcw } from 'lucide-react'
 import { CARD_TYPES } from '@shared/domain'
@@ -143,6 +144,9 @@ function CardForm({
 }
 
 export default function CardsPage({ target }: PageProps): React.JSX.Element {
+  let entranceIndex = 0
+
+  const [loaded, setLoaded] = useState(false)
   const [cards, setCards] = useState<Card[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [purposes, setPurposes] = useState<Purpose[]>([])
@@ -162,6 +166,7 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
     else setError(accountResult.error.message)
     if (purposeResult.ok) setPurposes(purposeResult.data)
     else setError(purposeResult.error.message)
+    if (cardResult.ok && accountResult.ok && purposeResult.ok) setLoaded(true)
   }
   useEffect(() => {
     void Promise.all([
@@ -175,6 +180,7 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
       else setError(accountResult.error.message)
       if (purposeResult.ok) setPurposes(purposeResult.data)
       else setError(purposeResult.error.message)
+      if (cardResult.ok && accountResult.ok && purposeResult.ok) setLoaded(true)
     })
   }, [])
   useEffect(() => {
@@ -197,80 +203,87 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
   const shown = cards.filter((card) => showInactive || card.isActive)
   return (
     <>
-      <header className="page-head">
-        <div>
-          <h1>카드</h1>
-          <p>결제 카드를 관리합니다.</p>
-        </div>
-        <div className="page-actions">
-          <Switch label="해지 카드 보기" checked={showInactive} onChange={setShowInactive} />
-          <AddButton onClick={() => setEditing('add')}>카드 추가</AddButton>
-        </div>
-      </header>
+      <Entrance order={entranceIndex++}>
+        <header className="page-head">
+          <div>
+            <h1>카드</h1>
+            <p>결제 카드를 관리합니다.</p>
+          </div>
+          <div className="page-actions">
+            <Switch label="해지 카드 보기" checked={showInactive} onChange={setShowInactive} />
+            <AddButton onClick={() => setEditing('add')}>카드 추가</AddButton>
+          </div>
+        </header>
+      </Entrance>
       {error && <p className="error-banner">{error}</p>}
-      {shown.length === 0 ? (
-        <EmptyState
-          kind="cards"
-          title="등록된 카드가 없습니다"
-          description="결제 카드를 추가해 보세요."
-          action={<AddButton onClick={() => setEditing('add')}>카드 추가</AddButton>}
-        />
-      ) : (
-        <div className="card-grid">
-          {shown.map((card) => {
-            const info = CARD_INFO[card.type]
-            return (
-              <article
-                id={`card-${card.id}`}
-                key={card.id}
-                className={`item-card payment-card ${!card.isActive ? 'inactive' : ''} ${target?.kind === 'card' && target.id === card.id ? 'highlighted' : ''}`}
-              >
-                <div className="card-top">
-                  <div className="card-kind">
-                    <Icon icon={info.icon} size={18} />
-                    {info.label}
-                  </div>
-                  {!card.isActive && <span className="badge">해지</span>}
-                </div>
-                <div className="card-title" title={card.name}>
-                  {card.name}
-                </div>
-                <div className="card-subtitle">
-                  {card.issuer}
-                  {card.numberTail && ` · ${card.numberTail}`}
-                </div>
-                {card.linkedAccount && (
-                  <div className="card-details">
-                    <span>
-                      연결: {card.linkedAccount.name}
-                      {!card.linkedAccount.isActive && ' (해지)'}
-                    </span>
-                  </div>
-                )}
-                {card.type === 'credit' && (
-                  <div className="card-details">매월 {card.paymentDay}일</div>
-                )}
-                <div className="card-actions">
-                  {card.isActive ? (
-                    <>
-                      <Button icon={Pencil} onClick={() => setEditing(card)}>
-                        수정
-                      </Button>
-                      <Button icon={Ban} onClick={() => setClosing(card)}>
-                        해지
-                      </Button>
-                    </>
-                  ) : (
-                    <Button icon={RotateCcw} onClick={() => restore(card.id)}>
-                      복구
-                    </Button>
-                  )}
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      )}
+      {loaded &&
+        (shown.length === 0 ? (
+          <Entrance order={entranceIndex++}>
+            <EmptyState
+              kind="cards"
+              title="등록된 카드가 없습니다"
+              description="결제 카드를 추가해 보세요."
+              action={<AddButton onClick={() => setEditing('add')}>카드 추가</AddButton>}
+            />
+          </Entrance>
+        ) : (
+          <div className="card-grid">
+            {shown.map((card) => {
+              const info = CARD_INFO[card.type]
+              return (
+                <Entrance order={entranceIndex++} wrap key={card.id}>
+                  <article
+                    id={`card-${card.id}`}
+
+                    className={`item-card payment-card ${!card.isActive ? 'inactive' : ''} ${target?.kind === 'card' && target.id === card.id ? 'highlighted' : ''}`}
+                  >
+                    <div className="card-top">
+                      <div className="card-kind">
+                        <Icon icon={info.icon} size={18} />
+                        {info.label}
+                      </div>
+                      {!card.isActive && <span className="badge">해지</span>}
+                    </div>
+                    <div className="card-title" title={card.name}>
+                      {card.name}
+                    </div>
+                    <div className="card-subtitle">
+                      {card.issuer}
+                      {card.numberTail && ` · ${card.numberTail}`}
+                    </div>
+                    {card.linkedAccount && (
+                      <div className="card-details">
+                        <span>
+                          연결: {card.linkedAccount.name}
+                          {!card.linkedAccount.isActive && ' (해지)'}
+                        </span>
+                      </div>
+                    )}
+                    {card.type === 'credit' && (
+                      <div className="card-details">매월 {card.paymentDay}일</div>
+                    )}
+                    <div className="card-actions">
+                      {card.isActive ? (
+                        <>
+                          <Button icon={Pencil} onClick={() => setEditing(card)}>
+                            수정
+                          </Button>
+                          <Button icon={Ban} onClick={() => setClosing(card)}>
+                            해지
+                          </Button>
+                        </>
+                      ) : (
+                        <Button icon={RotateCcw} onClick={() => restore(card.id)}>
+                          복구
+                        </Button>
+                      )}
+                    </div>
+                  </article>
+                </Entrance>
+              )
+            })}
+          </div>
+        ))}
       {editing && (
         <CardForm
           card={editing === 'add' ? null : editing}
