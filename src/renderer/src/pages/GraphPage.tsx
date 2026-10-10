@@ -42,17 +42,44 @@ interface GraphLink extends SimulationLinkDatum<GraphNode> {
 }
 type View = { scale: number; x: number; y: number }
 let nextLayoutSeed = 1
-const starlight = (color: string): string =>
-  '#' +
-  color
+// Display-only graph colors (GR-71); stored purpose colors stay unchanged.
+const starlightPalette: Record<string, string> = {
+  '#397768': '#5ACBB0',
+  '#346D82': '#4FBADD',
+  '#84723E': '#D9C464',
+  '#4C7865': '#8DCA9B',
+  '#566D7B': '#89B8E3',
+  '#8B6256': '#EEA39C',
+  '#9A684B': '#FFB288',
+  '#4F6F97': '#9FB5FF',
+  '#8E5868': '#F394B0',
+  '#6F7B45': '#B8D172',
+  '#4A7A83': '#77D1D5',
+  '#9A7244': '#FFC372'
+}
+function starlight(color: string): string {
+  const preset = starlightPalette[color.toUpperCase()]
+  if (preset) return preset
+  const channels = color
     .slice(1)
     .match(/../g)!
-    .map((channel) =>
-      Math.ceil((parseInt(channel, 16) + 255) / 2)
-        .toString(16)
-        .padStart(2, '0')
-    )
-    .join('')
+    .map((channel) => parseInt(channel, 16))
+  const maximum = Math.max(...channels)
+  return (
+    '#' +
+    channels
+      .map((channel) => (maximum === 0 ? 224 : Math.max(88, Math.round((channel * 224) / maximum))))
+      .map((channel) => channel.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase()
+  )
+}
+const nodeGlow = (node: GraphNode): { opacity: number; innerRadius: number; radius: number } =>
+  node.kind === 'purpose'
+    ? { opacity: 0.6, innerRadius: 8, radius: 14 }
+    : node.kind === 'account'
+      ? { opacity: 0.45, innerRadius: 6, radius: 12 }
+      : { opacity: 0.45, innerRadius: 5, radius: 11 }
 const radius = (node: GraphNode): number =>
   node.kind === 'purpose' ? 8 : node.kind === 'account' ? 6 : node.kind === 'card' ? 7 : 5
 const halfHeight = (node: GraphNode): number =>
@@ -102,22 +129,23 @@ function makeGraph(
       color: starlight(purpose.color),
       inactive: false
     })),
-    ...visibleAccounts.map((account) => ({
-      id: `a-${account.id}`,
-      kind: 'account' as Kind,
-      recordId: account.id,
-      name: account.name,
-      color: starlight(
-        purposes.find((purpose) => purpose.id === account.purposeId)?.color ?? '#666666'
-      ),
-      inactive: !account.isActive
-    })),
+    ...visibleAccounts.map((account) => {
+      const purpose = purposes.find((purpose) => purpose.id === account.purposeId)
+      return {
+        id: `a-${account.id}`,
+        kind: 'account' as Kind,
+        recordId: account.id,
+        name: account.name,
+        color: purpose ? starlight(purpose.color) : '#BABABA',
+        inactive: !account.isActive
+      }
+    }),
     ...visibleCards.map((card) => ({
       id: `c-${card.id}`,
       kind: 'card' as Kind,
       recordId: card.id,
       name: card.name,
-      color: '#B3B3B3',
+      color: '#BABABA',
       inactive: !card.isActive
     })),
     ...visibleFlows
@@ -127,7 +155,7 @@ function makeGraph(
         kind: flow.kind as 'income' | 'payment',
         recordId: flow.id,
         name: flow.name,
-        color: flow.kind === 'income' ? '#A7DBE4' : '#F0D49D',
+        color: flow.kind === 'income' ? '#7DE2FA' : '#F5CB6A',
         inactive: false
       }))
   ]
@@ -632,17 +660,17 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                         >
                           <stop
                             offset="0"
-                            stopColor={kind === 'focus' ? '#A7DBE4' : '#F0D49D'}
+                            stopColor={kind === 'focus' ? '#7DE2FA' : '#F5CB6A'}
                             stopOpacity="0"
                           />
                           <stop
                             offset="0.75"
-                            stopColor={kind === 'focus' ? '#A7DBE4' : '#F0D49D'}
+                            stopColor={kind === 'focus' ? '#7DE2FA' : '#F5CB6A'}
                             stopOpacity="1"
                           />
                           <stop
                             offset="1"
-                            stopColor={kind === 'focus' ? '#A7DBE4' : '#F0D49D'}
+                            stopColor={kind === 'focus' ? '#7DE2FA' : '#F5CB6A'}
                             stopOpacity="0"
                           />
                         </linearGradient>
@@ -672,18 +700,21 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                       </g>
                     ))}
                   {graph.nodes
-                    .filter((node) => node.kind === 'purpose')
-                    .map((node) => (
-                      <radialGradient key={node.id} id={`glow-${node.id}`}>
-                        <stop offset="0%" stopColor={node.color} stopOpacity="0.4" />
-                        <stop
-                          offset={`${(8 / 14) * 100}%`}
-                          stopColor={node.color}
-                          stopOpacity="0.4"
-                        />
-                        <stop offset="100%" stopColor={node.color} stopOpacity="0" />
-                      </radialGradient>
-                    ))}
+                    .filter((node) => !node.inactive)
+                    .map((node) => {
+                      const glow = nodeGlow(node)
+                      return (
+                        <radialGradient key={node.id} id={`glow-${node.id}`}>
+                          <stop offset="0%" stopColor={node.color} stopOpacity={glow.opacity} />
+                          <stop
+                            offset={`${(glow.innerRadius / glow.radius) * 100}%`}
+                            stopColor={node.color}
+                            stopOpacity={glow.opacity}
+                          />
+                          <stop offset="100%" stopColor={node.color} stopOpacity="0" />
+                        </radialGradient>
+                      )
+                    })}
                   <marker
                     id="graph-arrow-focus"
                     markerWidth="5"
@@ -693,7 +724,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                     orient="auto-start-reverse"
                     markerUnits="userSpaceOnUse"
                   >
-                    <path d="M0,0 L5,2.5 L0,5 Z" fill="#A7DBE4" />
+                    <path d="M0,0 L5,2.5 L0,5 Z" fill="#7DE2FA" />
                   </marker>
                   <marker
                     id="graph-arrow-amber"
@@ -704,7 +735,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                     orient="auto"
                     markerUnits="userSpaceOnUse"
                   >
-                    <path d="M0,0 L5,2.5 L0,5 Z" fill="#F0D49D" />
+                    <path d="M0,0 L5,2.5 L0,5 Z" fill="#F5CB6A" />
                   </marker>
                 </defs>
                 <g transform={`translate(${view.x},${view.y}) scale(${view.scale})`}>
@@ -756,9 +787,9 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                                 : 0.5,
                             stroke:
                               link.kind === 'account-payment'
-                                ? '#F0D49D'
+                                ? '#F5CB6A'
                                 : ['income-account', 'account-transfer'].includes(link.kind)
-                                  ? '#A7DBE4'
+                                  ? '#7DE2FA'
                                   : 'var(--muted)'
                           }}
                           x1={(a.x ?? 0) + ux * (radius(a) + (link.reverse ? 6 : 0))}
@@ -847,8 +878,12 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                         onPointerUp={(event) => nodeUp(event, node)}
                       >
                         <circle className="graph-hit" r={16} fill="transparent" />
-                        {node.kind === 'purpose' && (
-                          <circle className="graph-glow" r={14} fill={`url(#glow-${node.id})`} />
+                        {!node.inactive && (
+                          <circle
+                            className="graph-glow"
+                            r={nodeGlow(node).radius}
+                            fill={`url(#glow-${node.id})`}
+                          />
                         )}
                         {shape === 'rounded-rectangle' ? (
                           <rect x={-7} y={-4.5} width={14} height={9} rx={2} fill={node.color} />

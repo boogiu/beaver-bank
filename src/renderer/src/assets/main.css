@@ -1249,7 +1249,7 @@ select:focus-visible,
 }
 .legend-shape {
   display: inline-block;
-  background: #b3b3b3;
+  background: #bababa;
 }
 .legend-shape.large-circle {
   width: 16px;
@@ -1270,7 +1270,7 @@ select:focus-visible,
   width: 10px;
   height: 10px;
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-  background: #a7dbe4;
+  background: #7de2fa;
 }
 .legend-shape.triangle {
   width: 0;
@@ -1278,7 +1278,7 @@ select:focus-visible,
   background: transparent;
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-bottom: 9px solid #f0d49d;
+  border-bottom: 9px solid #f5cb6a;
 }
 .legend-line {
   display: inline-block;
@@ -1287,12 +1287,12 @@ select:focus-visible,
   position: relative;
 }
 .legend-line.focus {
-  background: #a7dbe4;
-  color: #a7dbe4;
+  background: #7de2fa;
+  color: #7de2fa;
 }
 .legend-line.amber {
-  background: #f0d49d;
-  color: #f0d49d;
+  background: #f5cb6a;
+  color: #f5cb6a;
 }
 .legend-line::after {
   content: '';
