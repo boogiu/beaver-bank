@@ -3,6 +3,7 @@ import { Entrance } from '../components/Entrance'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from 'd3-force'
 import type { Simulation, SimulationLinkDatum, SimulationNodeDatum } from 'd3-force'
+import type { CSSProperties } from 'react'
 import { Scan } from 'lucide-react'
 import type { Account, Card, Flow, Purpose } from '@shared/ipc'
 import type { PageProps } from '../App'
@@ -76,10 +77,20 @@ function starlight(color: string): string {
 }
 const nodeGlow = (node: GraphNode): { opacity: number; innerRadius: number; radius: number } =>
   node.kind === 'purpose'
-    ? { opacity: 0.6, innerRadius: 8, radius: 14 }
+    ? { opacity: 1, innerRadius: 8, radius: 15 }
     : node.kind === 'account'
-      ? { opacity: 0.45, innerRadius: 6, radius: 12 }
-      : { opacity: 0.45, innerRadius: 5, radius: 11 }
+      ? { opacity: 0.9, innerRadius: 6, radius: 13 }
+      : { opacity: 0.62, innerRadius: 6, radius: 12 }
+// Presentation-only, deterministic phase. CSS keeps ticking through opacity/view changes.
+function twinkleStyle(node: GraphNode): CSSProperties {
+  const seed = node.recordId * 5 + NODE_TYPES.findIndex((type) => type.kind === node.kind)
+  const period = 3.2 + 0.5 * (seed % 6)
+  const phase = (seed * 0.618034) % 1
+  return {
+    '--twinkle-period': `${period}s`,
+    '--twinkle-delay': `${-phase * period}s`
+  } as CSSProperties
+}
 const radius = (node: GraphNode): number =>
   node.kind === 'purpose' ? 8 : node.kind === 'account' ? 6 : node.kind === 'card' ? 7 : 5
 const halfHeight = (node: GraphNode): number =>
@@ -881,6 +892,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                         {!node.inactive && (
                           <circle
                             className="graph-glow"
+                            style={twinkleStyle(node)}
                             r={nodeGlow(node).radius}
                             fill={`url(#glow-${node.id})`}
                           />

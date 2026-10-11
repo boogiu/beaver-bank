@@ -1,13 +1,12 @@
 import { Entrance } from '../components/Entrance'
 import { useEffect, useState } from 'react'
-import { Ban, Pencil, RotateCcw } from 'lucide-react'
 import { CARD_TYPES } from '@shared/domain'
-import type { Account, ApiError, Card, CardInput, Purpose } from '@shared/ipc'
+import type { Account, ApiError, Card, CardInput, Flow, Purpose } from '@shared/ipc'
 import type { PageProps } from '../App'
-import { AddButton, Button, EmptyState, Switch } from '../components/Ui'
+import { AddButton, EmptyState, Switch } from '../components/Ui'
 import { ConfirmModal, Field, Modal, Select } from '../components/Modal'
 import { CARD_INFO } from '../components/domain-ui'
-import { PaymentCardFace } from '../components/PaymentCardFace'
+import { PaymentCardUnit } from '../components/PaymentCardUnit'
 
 const blank: CardInput = {
   name: '',
@@ -148,6 +147,7 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
   let entranceIndex = 0
 
   const [loaded, setLoaded] = useState(false)
+  const [flows, setFlows] = useState<Flow[] | null>(null)
   const [cards, setCards] = useState<Card[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [purposes, setPurposes] = useState<Purpose[]>([])
@@ -173,14 +173,17 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
     void Promise.all([
       window.api.listCards(true),
       window.api.listAccounts(true),
-      window.api.listPurposes()
-    ]).then(([cardResult, accountResult, purposeResult]) => {
+      window.api.listPurposes(),
+      window.api.listFlows()
+    ]).then(([cardResult, accountResult, purposeResult, flowResult]) => {
       if (cardResult.ok) setCards(cardResult.data)
       else setError(cardResult.error.message)
       if (accountResult.ok) setAccounts(accountResult.data)
       else setError(accountResult.error.message)
       if (purposeResult.ok) setPurposes(purposeResult.data)
       else setError(purposeResult.error.message)
+      if (flowResult.ok) setFlows(flowResult.data)
+      else setError(flowResult.error.message)
       if (cardResult.ok && accountResult.ok && purposeResult.ok) setLoaded(true)
     })
   }, [])
@@ -234,33 +237,17 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
               const purpose = purposes.find((purpose) => purpose.id === account?.purposeId)
               return (
                 <Entrance order={entranceIndex++} wrap key={card.id}>
-                  <article
-                    id={`card-${card.id}`}
-
-                    className="payment-card-unit"
-                  >
-                    <PaymentCardFace
-                      card={card}
-                      purposeColor={purpose?.color}
-                      highlighted={target?.kind === 'card' && target.id === card.id}
-                    />
-                    <div className="payment-card-actions">
-                      {card.isActive ? (
-                        <>
-                          <Button icon={Pencil} onClick={() => setEditing(card)}>
-                            수정
-                          </Button>
-                          <Button icon={Ban} onClick={() => setClosing(card)}>
-                            해지
-                          </Button>
-                        </>
-                      ) : (
-                        <Button icon={RotateCcw} onClick={() => restore(card.id)}>
-                          복구
-                        </Button>
-                      )}
-                    </div>
-                  </article>
+                  <PaymentCardUnit
+                    card={card}
+                    purposeColor={purpose?.color}
+                    flows={flows}
+                    highlighted={target?.kind === 'card' && target.id === card.id}
+                    onEdit={() => setEditing(card)}
+                    onClose={() => setClosing(card)}
+                    onRestore={() => {
+                      void restore(card.id)
+                    }}
+                  />
                 </Entrance>
               )
             })}

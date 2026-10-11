@@ -231,11 +231,45 @@ select:focus-visible,
 .dam-water {
   position: absolute;
   bottom: 0;
-  left: 108px;
+  left: 100px;
   right: 0;
   height: 44px;
-  background: var(--focus);
-  opacity: 0.35;
+  overflow: hidden;
+}
+.dam-water-drawing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+}
+.dam-wave-front {
+  animation: dam-wave-front 4s linear infinite;
+}
+.dam-wave-back {
+  animation: dam-wave-back 8s linear infinite;
+}
+.dam-shimmer {
+  opacity: 0.8;
+  animation: dam-shimmer 4s ease-in-out infinite;
+}
+@keyframes dam-wave-front {
+  to {
+    transform: translateX(-22px);
+  }
+}
+@keyframes dam-wave-back {
+  to {
+    transform: translateX(22px);
+  }
+}
+@keyframes dam-shimmer {
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.25;
+  }
 }
 .dam-log {
   position: absolute;
@@ -507,6 +541,57 @@ select:focus-visible,
   gap: 7px;
   margin-top: 8px;
 }
+.payment-flip-button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  margin-left: auto;
+  justify-content: center;
+}
+.payment-slot {
+  --face-width: 312px;
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  --tilt-time: 0.15s;
+  --light-time: 0.15s;
+  --light-opacity: 0;
+  --light-x: 156px;
+  --light-y: 98.5px;
+  position: relative;
+  width: 312px;
+  height: 197px;
+  perspective: 800px;
+  perspective-origin: center;
+  cursor: pointer;
+}
+.payment-card-lift,
+.payment-tilt,
+.payment-flipper {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+.payment-card-lift {
+  transition: translate 0.15s ease-out;
+}
+.payment-card-unit:hover .payment-card-lift {
+  translate: 0 -2px;
+}
+.payment-tilt {
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transition: transform var(--tilt-time) ease-out;
+}
+.payment-flipper {
+  transition: transform 0.5s ease-out;
+}
+.payment-flipper > .payment-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+.payment-face-back {
+  transform: rotateY(180deg);
+}
 .payment-face {
   --face-inset: 18px;
   position: relative;
@@ -531,7 +616,107 @@ select:focus-visible,
 }
 .payment-face > * {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
+}
+.payment-face > .payment-follow-light {
+  z-index: 0;
+  inset: 0;
+  background: radial-gradient(
+    circle calc(var(--face-width) * 0.48) at var(--light-x) var(--light-y),
+    color-mix(in srgb, var(--face-light) 90%, transparent) 0%,
+    transparent 100%
+  );
+  opacity: var(--light-opacity);
+  transition: opacity var(--light-time) ease-out;
+  pointer-events: none;
+}
+.payment-edge-light {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  opacity: var(--light-opacity);
+  transition: opacity var(--light-time) ease-out;
+  pointer-events: none;
+}
+.payment-edge-back {
+  transform: rotateY(180deg);
+}
+.payment-back-heading,
+.payment-back-payments,
+.payment-back-memo-heading,
+.payment-back-memo {
+  left: calc(var(--face-inset) - 1px);
+  right: calc(var(--face-inset) - 1px);
+  font-weight: 400;
+}
+.payment-back-heading,
+.payment-back-memo-heading {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  line-height: 14px;
+}
+.payment-back-heading {
+  top: calc(var(--face-inset) - 1px);
+}
+.payment-back-payments {
+  top: calc(var(--face-inset) + 17px);
+}
+.payment-back-row {
+  display: flex;
+  gap: 8px;
+  height: 20px;
+  align-items: baseline;
+  line-height: 20px;
+}
+.payment-back-flow-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.payment-back-schedule,
+.payment-back-more {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.payment-back-memo-heading {
+  top: 126px;
+}
+.payment-back-memo {
+  top: 142px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 18px;
+}
+.payment-back-empty {
+  font-size: 14px;
+  line-height: 20px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.payment-back-memo.payment-back-empty {
+  line-height: 18px;
+}
+.payment-face-closed .payment-back-heading,
+.payment-face-closed .payment-back-memo-heading,
+.payment-face-closed .payment-back-empty,
+.payment-face-closed .payment-back-schedule,
+.payment-face-closed .payment-back-more {
+  color: var(--muted);
+}
+.payment-face-closed .payment-back-heading {
+  right: calc(var(--face-inset) + 50px);
 }
 .payment-face-name,
 .payment-face-issuer {
@@ -672,7 +857,6 @@ select:focus-visible,
   stroke: var(--surface);
 }
 .payment-card-unit:hover .payment-face {
-  translate: 0 -2px;
   border-color: rgba(255, 255, 255, 0.5);
 }
 .payment-card-unit:hover .payment-face-closed {
@@ -686,7 +870,7 @@ select:focus-visible,
 .payment-face:not(.payment-face-closed)::before {
   content: '';
   position: absolute;
-  z-index: 0;
+  z-index: 1;
   top: -50%;
   left: -80%;
   width: 45%;
@@ -718,6 +902,17 @@ select:focus-visible,
   .payment-card-unit {
     width: 280px;
   }
+  .payment-slot {
+    --face-width: 280px;
+    width: 280px;
+    height: 177px;
+  }
+  .payment-back-memo-heading {
+    top: 108px;
+  }
+  .payment-back-memo {
+    top: 124px;
+  }
   .payment-face {
     --face-inset: 16px;
     width: 280px;
@@ -743,8 +938,15 @@ select:focus-visible,
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .payment-card-unit:hover .payment-face {
+  .payment-card-unit:hover .payment-card-lift {
     translate: none;
+  }
+  .payment-tilt {
+    transform: none;
+  }
+  .payment-follow-light,
+  .payment-edge-light {
+    display: none;
   }
   .payment-face::before {
     display: none;
@@ -1424,6 +1626,20 @@ select:focus-visible,
 }
 .graph-node > :not(.graph-hit) {
   pointer-events: none;
+}
+.graph-glow {
+  opacity: 0.75;
+  animation: graph-twinkle var(--twinkle-period) ease-in-out var(--twinkle-delay) infinite;
+}
+@keyframes graph-twinkle {
+  0%,
+  60%,
+  100% {
+    opacity: 0.75;
+  }
+  75% {
+    opacity: 1;
+  }
 }
 .graph-node circle,
 .graph-node rect,
