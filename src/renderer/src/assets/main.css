@@ -2092,3 +2092,159 @@ select:focus-visible,
 .animated-amount {
   font-variant-numeric: tabular-nums;
 }
+/* Account passbooks: all rules below are exclusive to AccountsPage. */
+.passbook-groups {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 28px 16px;
+}
+.passbook-group {
+  width: min(calc(var(--passbook-count) * 328px - 16px), calc(round(down, 100cqw + 16px, 328px) - 16px));
+  flex: 0 0 auto;
+  min-width: 312px;
+}
+.passbook-group h2 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: var(--size-lg);
+  overflow-wrap: anywhere;
+}
+.passbook-group h2 .purpose-amount { font-size: var(--size-md); font-weight: 400; }
+.passbook-grid { display: grid; grid-template-columns: repeat(auto-fill, 312px); gap: 16px; }
+.passbook-unit { width: 312px; will-change: transform; }
+.passbook-actions { display: flex; gap: 7px; margin-top: 8px; height: 34px; }
+.passbook-open-button { width: 34px; height: 34px; padding: 0; margin-left: auto; flex: 0 0 34px; }
+.passbook-slot {
+  --pb-tilt-x: 0deg;
+  --pb-tilt-y: 0deg;
+  --pb-tilt-time: 0.15s;
+  --pb-light-time: 0.15s;
+  --pb-light-opacity: 0;
+  --pb-light-x: 156px;
+  --pb-light-y: 98px;
+  position: relative;
+  width: 312px;
+  height: 196px;
+  perspective: 800px;
+  perspective-origin: center;
+  cursor: pointer;
+}
+.passbook-lift, .passbook-tilt { position: absolute; inset: 0; transform-style: preserve-3d; }
+.passbook-lift { transition: translate 0.15s ease-out; }
+.passbook-unit[data-mouse] .passbook-lift { translate: 0 -2px; }
+.passbook-tilt { transform: rotateX(var(--pb-tilt-x)) rotateY(var(--pb-tilt-y)); transition: transform var(--pb-tilt-time) ease-out; }
+.passbook-surface {
+  position: relative;
+  width: 312px;
+  height: 196px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px 4px 12px 12px;
+  transition: border-color 0.15s ease-out;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+}
+.passbook-unit[data-mouse] .passbook-surface { border-color: rgba(255,255,255,0.5); }
+.passbook-pages { position: absolute; inset: -1px; border-radius: inherit; overflow: hidden; }
+.passbook-cover, .passbook-inside { position: absolute; inset: 0; isolation: isolate; }
+.passbook-cover { background: linear-gradient(135deg, var(--pb-light) 0%, var(--pb-dark) 100%); transform-origin: center top; transition: transform 0.4s ease-out; }
+.passbook-black { background: linear-gradient(135deg, var(--pb-light) 0%, #262626 55%, #161616 100%); }
+.passbook-open .passbook-cover { transform: scaleY(0); }
+.passbook-cover > *, .passbook-inside > * { position: absolute; z-index: 2; }
+.passbook-cover > .passbook-follow {
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle 150px at var(--pb-light-x) var(--pb-light-y), color-mix(in srgb, var(--pb-light) 90%, transparent) 0%, transparent 100%);
+  opacity: var(--pb-light-opacity);
+  transition: opacity var(--pb-light-time) ease-out;
+}
+.passbook-cover > .passbook-sheen {
+  top: -70px;
+  bottom: -70px;
+  left: 0;
+  width: 140.4px;
+  z-index: 1;
+  pointer-events: none;
+  transform: translateX(-230px) skewX(-20deg);
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
+}
+.passbook-spine { top: 0; left: 0; width: 312px; height: 10px; background: rgba(0,0,0,0.28); pointer-events: none; }
+.passbook-binding { left: 12px; top: 14px; color: rgba(255,255,255,0.6); pointer-events: none; }
+.passbook-heading, .passbook-inside-heading { top: 24px; left: 18px; right: 18px; height: 20px; display: flex; align-items: center; }
+.passbook-name { flex: 1; min-width: 0; margin-right: 12px; font-size: 16px; font-weight: 600; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.passbook-kind { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; font-weight: 600; }
+.passbook-kind .icon { color: var(--amber); }
+.passbook-heading .badge, .passbook-inside-heading .badge { margin-right: 8px; flex: 0 0 auto; line-height: 16px; font-weight: 400; }
+.passbook-bank-row { top: 46px; left: 18px; right: 18px; display: flex; justify-content: space-between; gap: 12px; color: rgba(255,255,255,0.85); }
+.passbook-bank { display: flex; min-width: 0; }
+.passbook-bank > :first-child, .passbook-purpose > :last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.passbook-tail { flex: 0 0 auto; white-space: pre; }
+.passbook-purpose { display: flex; align-items: center; gap: 5px; max-width: 120px; min-width: 0; flex-shrink: 0; }
+.passbook-dot { width: 10px; height: 10px; border: 1px solid rgba(255,255,255,0.6); border-radius: 50%; flex: 0 0 10px; }
+.passbook-emboss { left: 230px; top: 66px; color: rgba(255,255,255,0.1); pointer-events: none; }
+.passbook-period { top: 74px; left: 18px; right: 18px; display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.passbook-period > :last-child { flex: 0 0 auto; }
+.passbook-period-track { flex: 1; height: 4px; border-radius: 2px; overflow: hidden; background: rgba(255,255,255,0.1); pointer-events: none; }
+.passbook-period-track > span { display: block; height: 100%; background: var(--amber); }
+.passbook-detail { left: 18px; right: 18px; display: flex; justify-content: space-between; gap: 12px; }
+.passbook-detail-first { top: 94px; }
+.passbook-detail-second { top: 112px; }
+.passbook-detail > :first-child { color: rgba(255,255,255,0.85); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.passbook-detail > :nth-child(2) { flex: 0 0 auto; white-space: nowrap; }
+.passbook-balance-heading { top: 138px; left: 18px; color: rgba(255,255,255,0.85); line-height: 14px; }
+.passbook-balance { top: 154px; left: 18px; font-size: 20px; font-weight: 600; line-height: 24px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.passbook-negative::after { content: ''; position: absolute; left: 0; right: 0; top: 23px; height: 2px; background: var(--amber); }
+.passbook-missing { left: 18px; top: 160px; font-size: 14px; line-height: 18px; color: rgba(255,255,255,0.85); }
+.passbook-cover > .passbook-fold-shade { inset: 0; z-index: 3; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.4s ease-out; }
+.passbook-open .passbook-fold-shade { opacity: 0.4; }
+.passbook-edge { position: absolute; top: -1px; left: -1px; pointer-events: none; opacity: var(--pb-light-opacity); transition: opacity var(--pb-light-time) ease-out; }
+.passbook-inside { background: var(--surface); color: var(--text); }
+.passbook-inside .passbook-spine { background: var(--pb-light); }
+.passbook-inside-heading { height: 18px; }
+.passbook-inside-name { flex: 1; min-width: 0; margin-right: 12px; font-size: 14px; font-weight: 600; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.passbook-flow-count { flex: 0 0 auto; color: var(--muted); line-height: 14px; }
+.passbook-ruled { left: 18px; right: 18px; top: 46px; pointer-events: none; }
+.passbook-ruled span { position: absolute; width: 100%; height: 1px; background: var(--border); }
+.passbook-flows { left: 18px; right: 18px; top: 47px; }
+.passbook-flow { display: flex; align-items: center; height: 20px; }
+.passbook-flow > svg { flex: 0 0 14px; margin-right: 6px; }
+.passbook-incoming { color: var(--focus); }
+.passbook-outgoing { color: var(--amber); }
+.passbook-flow-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.passbook-schedule { flex: 0 0 auto; margin-left: 8px; color: var(--muted); }
+.passbook-more { height: 19px; margin-left: 20px; color: var(--muted); }
+.passbook-empty { color: var(--muted); font-size: 14px; }
+.passbook-memo { top: 156px; left: 18px; right: 18px; height: 18px; line-height: 18px; display: flex; gap: 8px; }
+.passbook-memo > :first-child { color: var(--muted); flex: 0 0 auto; }
+.passbook-memo > :last-child { font-size: 14px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.passbook-closed .passbook-surface { border-color: var(--border); color: var(--muted); }
+.passbook-closed .passbook-cover { background: var(--surface); }
+.passbook-closed .passbook-cover .passbook-kind .icon,
+.passbook-closed .passbook-cover .passbook-bank-row,
+.passbook-closed .passbook-cover .passbook-detail > span,
+.passbook-closed .passbook-cover .passbook-balance-heading,
+.passbook-closed .passbook-cover .passbook-missing,
+.passbook-closed .passbook-binding,
+.passbook-closed .passbook-inside,
+.passbook-closed .passbook-flow > svg { color: var(--muted); }
+.passbook-closed .passbook-dot, .passbook-closed .passbook-negative::after { background: var(--muted); border: none; }
+.passbook-closed .passbook-inside .passbook-spine { background: rgba(0,0,0,0.28); }
+.passbook-closed[data-mouse] .passbook-surface { border-color: var(--muted); }
+.passbook-highlighted .passbook-surface, .passbook-highlighted[data-mouse] .passbook-surface { border-color: var(--focus); outline: 1px solid var(--focus); }
+@media (prefers-reduced-motion: reduce) {
+  .passbook-unit[data-mouse] .passbook-lift { translate: none; }
+  .passbook-tilt { transform: none; }
+  .passbook-follow, .passbook-sheen, .passbook-edge { display: none; }
+}
+.passbook-surface::after { content: ''; position: absolute; inset: -1px; border: 1px solid; border-color: inherit; border-radius: inherit; pointer-events: none; }
+.passbook-surface::after { z-index: 3; }
+.passbook-edge { z-index: 4; }
+/* PB-15 specifies the page's final 28px gap even at the compact breakpoint. */
+.page:has(.passbook-groups) { padding-bottom: 28px; }

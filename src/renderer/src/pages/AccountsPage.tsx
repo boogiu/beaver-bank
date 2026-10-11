@@ -1,20 +1,23 @@
 import { Entrance } from '../components/Entrance'
 import { AmountInput } from '../components/AmountInput'
 import { useCallback, useEffect, useState } from 'react'
-import { Pencil, RotateCcw, Ban, SlidersHorizontal } from 'lucide-react'
+import type { CSSProperties } from 'react'
 import { ACCOUNT_TYPES, INTEREST_TYPES, TAX_TYPES } from '@shared/domain'
 import type {
   Account,
   AccountBalance,
   AccountInput,
   ApiError,
+  DashboardData,
+  Flow,
   Purpose,
   PurposeAmount
 } from '@shared/ipc'
 import type { PageProps } from '../App'
-import { AddButton, Button, EmptyState, Icon, PurposeAmountLabel, Switch } from '../components/Ui'
+import { AddButton, EmptyState, PurposeAmountLabel, Switch } from '../components/Ui'
+import { AccountPassbook } from '../components/AccountPassbook'
 import { ConfirmModal, Field, Modal, Select } from '../components/Modal'
-import { ACCOUNT_INFO, money } from '../components/domain-ui'
+import { ACCOUNT_INFO } from '../components/domain-ui'
 import BalanceModal from './BalanceModal'
 
 const blank: AccountInput = {
@@ -235,18 +238,28 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
   const [purposes, setPurposes] = useState<Purpose[]>([])
   const [balances, setBalances] = useState<AccountBalance[]>([])
   const [amounts, setAmounts] = useState<PurposeAmount[]>([])
+  const [flows, setFlows] = useState<Flow[] | null>(null)
+  const [savings, setSavings] = useState<DashboardData['savings']>([])
   const [balancing, setBalancing] = useState<Account | null>(null)
   const [showInactive, setShowInactive] = useState(target?.kind === 'account' && target.inactive)
   const [editing, setEditing] = useState<Account | null | 'add'>(null)
   const [closing, setClosing] = useState<Account | null>(null)
   const [error, setError] = useState<string | null>(null)
   const refresh = useCallback(async (): Promise<void> => {
-    const [accountResult, purposeResult, balanceResult, amountResult] = await Promise.all([
-      window.api.listAccounts(true),
-      window.api.listPurposes(),
-      window.api.listBalances(),
-      window.api.listPurposeAmounts()
-    ])
+    const [accountResult, purposeResult, balanceResult, amountResult, flowResult, dashboardResult] =
+      await Promise.all([
+        window.api.listAccounts(true),
+        window.api.listPurposes(),
+        window.api.listBalances(),
+        window.api.listPurposeAmounts(),
+        window.api.listFlows(),
+        window.api.getDashboard()
+      ])
+    setError(null)
+    setFlows(flowResult.ok ? flowResult.data : null)
+    if (!flowResult.ok) setError(flowResult.error.message)
+    setSavings(dashboardResult.ok ? dashboardResult.data.savings : [])
+    if (!dashboardResult.ok) setError(dashboardResult.error.message)
     if (accountResult.ok) setAccounts(accountResult.data)
     else setError(accountResult.error.message)
     if (purposeResult.ok) setPurposes(purposeResult.data)
@@ -255,7 +268,7 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
     else setError(balanceResult.error.message)
     if (amountResult.ok) setAmounts(amountResult.data)
     else setError(amountResult.error.message)
-    if (accountResult.ok && purposeResult.ok && balanceResult.ok && amountResult.ok) setLoaded(true)
+    setLoaded(accountResult.ok && purposeResult.ok && balanceResult.ok && amountResult.ok)
   }, [])
   useEffect(() => {
     void Promise.resolve().then(refresh)
@@ -308,113 +321,49 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
             />
           </Entrance>
         ) : (
-          groups.map((group) => {
-            const members = shown.filter((account) => account.purposeId === group.id)
-            if (!members.length) return null
-            return (
-              <section className="section" key={group.id ?? 'none'}>
-                <Entrance order={entranceIndex++}>
-                  <h2>
-                    {group.color && (
-                      <span className="color-dot" style={{ backgroundColor: group.color }} />
-                    )}
-                    <span className="purpose-heading-name">{group.label}</span>
-                    <PurposeAmountLabel value={amounts.find((row) => row.purposeId === group.id)} />
-                  </h2>
-                </Entrance>
-                <div className="card-grid">
-                  {members.map((account) => {
-                    const info = ACCOUNT_INFO[account.type]
-                    const balance = balances.find((row) => row.accountId === account.id)
-                    return (
+          <div className="passbook-groups">
+            {groups.map((group) => {
+              const members = shown.filter((account) => account.purposeId === group.id)
+              if (!members.length) return null
+              return (
+                <section
+                  className="passbook-group"
+                  key={group.id ?? 'none'}
+                  style={{ '--passbook-count': members.length } as CSSProperties}
+                >
+                  <Entrance order={entranceIndex++}>
+                    <h2>
+                      {group.color && (
+                        <span className="color-dot" style={{ backgroundColor: group.color }} />
+                      )}
+                      <span className="purpose-heading-name">{group.label}</span>
+                      <PurposeAmountLabel
+                        value={amounts.find((row) => row.purposeId === group.id)}
+                      />
+                    </h2>
+                  </Entrance>
+                  <div className="passbook-grid">
+                    {members.map((account) => (
                       <Entrance order={entranceIndex++} wrap key={account.id}>
-                        <article
-                          id={`account-${account.id}`}
-
-                          className={`item-card ${!account.isActive ? 'inactive' : ''} ${target?.kind === 'account' && target.id === account.id ? 'highlighted' : ''}`}
-                        >
-                          <div className="card-top">
-                            <div className="card-kind">
-                              <Icon icon={info.icon} size={18} />
-                              {info.label}
-                            </div>
-                            {!account.isActive && <span className="badge">해지</span>}
-                          </div>
-                          <div className="card-title" title={account.name}>
-                            {account.name}
-                          </div>
-                          <div className="card-subtitle">
-                            {account.bank}
-                            {account.numberTail && ` · ${account.numberTail}`}
-                          </div>
-                          {balance && (
-                            <div className="card-balance">
-                              {balance.balance === null ? (
-                                <span className="muted">잔액 미입력</span>
-                              ) : (
-                                <>
-                                  <div className="balance-value">
-                                    <span>잔액</span>
-                                    <strong className={balance.balance < 0 ? 'negative' : ''}>
-                                      {money(balance.balance)}
-                                    </strong>
-                                  </div>
-                                  <span className="balance-base">{balance.baseDate} 보정 기준</span>
-                                </>
-                              )}
-                            </div>
-                          )}
-                          {group.color && (
-                            <div className="card-purpose">
-                              <span
-                                className="color-dot"
-                                style={{ backgroundColor: group.color }}
-                              />
-                              {group.label}
-                            </div>
-                          )}
-                          {account.savings && (
-                            <div className="card-details">
-                              {account.monthlyContribution > 0 && (
-                                <span>월 납입 {money(account.monthlyContribution)}</span>
-                              )}
-                              <span>연 {account.savings.interestRate}%</span>
-                              <span>{account.savings.maturityDate}</span>
-                              {account.savings.targetAmount !== null && (
-                                <span>{money(account.savings.targetAmount)}</span>
-                              )}
-                            </div>
-                          )}
-                          <div className="card-actions">
-                            {account.isActive ? (
-                              <>
-                                <Button icon={Pencil} onClick={() => setEditing(account)}>
-                                  수정
-                                </Button>
-                                <Button icon={Ban} onClick={() => setClosing(account)}>
-                                  해지
-                                </Button>
-                                <Button
-                                  icon={SlidersHorizontal}
-                                  onClick={() => setBalancing(account)}
-                                >
-                                  {balance?.balance == null ? '잔액 입력' : '잔액 보정'}
-                                </Button>
-                              </>
-                            ) : (
-                              <Button icon={RotateCcw} onClick={() => restore(account.id)}>
-                                복구
-                              </Button>
-                            )}
-                          </div>
-                        </article>
+                        <AccountPassbook
+                          account={account}
+                          balance={balances.find((row) => row.accountId === account.id)}
+                          purpose={purposes.find((purpose) => purpose.id === account.purposeId)}
+                          progress={savings.find((row) => row.accountId === account.id)?.progress}
+                          flows={flows}
+                          highlighted={target?.kind === 'account' && target.id === account.id}
+                          onEdit={() => setEditing(account)}
+                          onClose={() => setClosing(account)}
+                          onBalance={() => setBalancing(account)}
+                          onRestore={() => void restore(account.id)}
+                        />
                       </Entrance>
-                    )
-                  })}
-                </div>
-              </section>
-            )
-          })
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
+          </div>
         ))}
       {editing && (
         <AccountForm
