@@ -6,18 +6,9 @@ import { mkdirSync } from 'fs'
 import { join } from 'path'
 import type { DbStatus } from '../../shared/ipc'
 import * as schema from './schema'
+import { readMigrationRecords, readTableCounts } from './status'
 
 export type AppDatabase = BetterSQLite3Database<typeof schema>
-
-const TABLES = [
-  'purposes',
-  'accounts',
-  'cards',
-  'savings_details',
-  'flows',
-  'flow_overrides',
-  'balance_snapshots'
-] as const
 
 let sqlite: Database.Database | null = null
 let db: AppDatabase | null = null
@@ -56,13 +47,10 @@ export function getDbStatus(): DbStatus {
   if (!sqlite) throw new Error('DB가 열려 있지 않습니다.')
   const conn = sqlite
 
-  const count = (table: string): number =>
-    (conn.prepare(`select count(*) as n from "${table}"`).get() as { n: number }).n
-
   return {
     path: getDbPath(),
     isDev: !app.isPackaged,
-    migrations: count('__drizzle_migrations'),
-    tables: TABLES.map((name) => ({ name, rows: count(name) }))
+    migrations: readMigrationRecords(conn)!.length,
+    tables: readTableCounts(conn)
   }
 }

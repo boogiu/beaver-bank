@@ -23,7 +23,22 @@ export function resetDemoDatabase(): void {
   if (resolve(app.getPath('userData')) !== expected || resolve(dirname(file)) !== expected) {
     throw new Error('데모 데이터 폴더를 확인하지 못했습니다.')
   }
-  for (const suffix of ['', '-wal', '-shm']) rmSync(file + suffix, { force: true })
+  const deadline = Date.now() + 2000
+  const pause = new Int32Array(new SharedArrayBuffer(4))
+  for (const suffix of ['', '-wal', '-shm']) {
+    for (;;) {
+      try {
+        rmSync(file + suffix, { force: true })
+        break
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        if (code !== 'EBUSY' && code !== 'EPERM') throw error
+        const remaining = deadline - Date.now()
+        if (remaining <= 0) throw error
+        Atomics.wait(pause, 0, 0, Math.min(5, remaining))
+      }
+    }
+  }
 }
 
 export function seedDemo(today = new Date()): void {
