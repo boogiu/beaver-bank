@@ -5,6 +5,7 @@ import type { ApiError } from '@shared/ipc'
 import type { LucideIcon } from 'lucide-react'
 import { Button, Icon } from './Ui'
 import { getReducedMotion } from '../hooks/useReducedMotion'
+import { useExternalModal } from '../hooks/useExternalRefresh'
 
 // 호출부는 닫는 즉시 기능과 상태를 끝낸다. 남기는 복제는 입력·역할 없는 모습뿐이다.
 function leaveAppearance(backdrop: HTMLElement): void {
@@ -49,6 +50,8 @@ export function Modal({
   error?: ApiError | null
   small?: boolean
 }): React.JSX.Element {
+  useExternalModal()
+  const [fieldError, setFieldError] = useState(false)
   const modal = useRef<HTMLDivElement>(null)
   const active = useRef(true)
   const submitting = useRef(false)
@@ -79,16 +82,23 @@ export function Modal({
       if (previous?.isConnected) previous.focus()
     }
   }, [])
-  useEffect(() => {
-    if (!error?.field) return
-    const field = modal.current?.querySelector<HTMLElement>(`[data-field="${error.field}"]`)
+  useLayoutEffect(() => {
+    const field = error?.field
+      ? [...(modal.current?.querySelectorAll<HTMLElement>('[data-field]') ?? [])].find(
+          (element) =>
+            element.dataset.field === error.field &&
+            element.querySelector('input, textarea, button')
+        )
+      : undefined
+    setFieldError(Boolean(field))
     field?.scrollIntoView({ block: 'nearest', behavior: getReducedMotion() ? 'instant' : 'smooth' })
     field?.querySelector<HTMLElement>('input, textarea, button')?.focus()
   }, [error])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const dialogs = document.querySelectorAll('[role="dialog"]')
-      if (!active.current || dialogs[dialogs.length - 1] !== modal.current || event.isComposing) return
+      if (!active.current || dialogs[dialogs.length - 1] !== modal.current || event.isComposing)
+        return
       if (event.key === 'Escape') {
         event.preventDefault()
         close()
@@ -137,7 +147,7 @@ export function Modal({
         </div>
         <div className="modal-body">
           {children}
-          {error && !error.field && <p className="error-banner">{error.message}</p>}
+          {error && !fieldError && <p className="error-banner">{error.message}</p>}
         </div>
         <div className="modal-foot">
           <Button onClick={close}>취소</Button>

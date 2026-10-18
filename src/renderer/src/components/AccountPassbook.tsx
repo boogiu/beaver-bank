@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { CSSProperties, PointerEvent } from 'react'
 import {
   ArrowDownLeft,
@@ -51,8 +51,12 @@ export function AccountPassbook({
   onEdit,
   onClose,
   onBalance,
-  onRestore
+  onRestore,
+  open,
+  onOpenChange
 }: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
   account: Account
   balance: AccountBalance | undefined
   purpose: Purpose | undefined
@@ -64,7 +68,6 @@ export function AccountPassbook({
   onBalance: () => void
   onRestore: () => void
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
   const slot = useRef<HTMLDivElement>(null)
   const sheen = useRef<Animation | null>(null)
   const reduced = useReducedMotion()
@@ -73,7 +76,7 @@ export function AccountPassbook({
   const savingsCover = account.type === 'installment' || account.type === 'deposit'
   const toggle = (): void => {
     sheen.current?.cancel()
-    setOpen((value) => !value)
+    onOpenChange(!open)
   }
   const reset = (): void => {
     const element = slot.current

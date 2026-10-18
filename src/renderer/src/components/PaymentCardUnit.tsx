@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { PointerEvent } from 'react'
 import { Ban, FlipHorizontal2, Pencil, RotateCcw } from 'lucide-react'
 import type { Card, Flow } from '@shared/ipc'
@@ -13,8 +13,12 @@ export function PaymentCardUnit({
   flows,
   onEdit,
   onClose,
-  onRestore
+  onRestore,
+  turns,
+  onTurn
 }: {
+  turns: number
+  onTurn: () => void
   card: Card
   purposeColor: string | undefined
   highlighted: boolean
@@ -23,11 +27,10 @@ export function PaymentCardUnit({
   onClose: () => void
   onRestore: () => void
 }): React.JSX.Element {
-  const [turns, setTurns] = useState(0)
   const flipped = turns % 2 === 1
   const slot = useRef<HTMLDivElement>(null)
   const reduced = useReducedMotion()
-  const flip = (): void => setTurns((value) => value + 1)
+  const flip = onTurn
   const reset = (): void => {
     const element = slot.current
     if (!element) return

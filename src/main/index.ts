@@ -5,6 +5,9 @@ import icon from '../../resources/icon.png?asset'
 import { closeDatabase, getDbStatus, openDatabase } from './db'
 import * as service from './db/service'
 import { configureDemo, resetDemoDatabase, seedDemo } from './demo'
+import { watchExternalChanges } from './external-changes'
+
+let externalChanges: ReturnType<typeof watchExternalChanges> | undefined
 
 const demo = process.argv.includes('--demo')
 if (demo) configureDemo()
@@ -26,6 +29,7 @@ function createWindow(): void {
     }
   })
 
+  externalChanges?.attach(mainWindow)
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
@@ -156,6 +160,7 @@ app.whenReady().then(() => {
   }
 
   registerIpc()
+  externalChanges = watchExternalChanges()
   createWindow()
 
   app.on('activate', function () {
@@ -170,5 +175,6 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', () => {
+  externalChanges?.stop()
   closeDatabase()
 })

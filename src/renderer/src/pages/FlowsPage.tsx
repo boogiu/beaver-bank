@@ -1,3 +1,4 @@
+import { useExternalRefresh } from '../hooks/useExternalRefresh'
 import { Entrance } from '../components/Entrance'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Ban, Pencil, RotateCcw, Trash2 } from 'lucide-react'
@@ -379,52 +380,26 @@ export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX
     month: Number(today().slice(5, 7))
   }))
   const [monthly, setMonthly] = useState<MonthlyFlows | null>(null)
-  const [monthlyRevision, setMonthlyRevision] = useState(0)
   const [viewVersion, setViewVersion] = useState(0)
   const [monthVersion, setMonthVersion] = useState(0)
   const [occurrence, setOccurrence] = useState<Occurrence | null>(null)
   const targetRef = useRef<HTMLElement>(null)
   useEffect(() => {
-    if (view === 'flows' && target?.kind === 'flow' && flows.length) {
+    if (view === 'flows' && target?.kind === 'flow' && loaded) {
       targetRef.current?.scrollIntoView({ block: 'nearest' })
     }
-  }, [view, target, flows])
-  useEffect(() => {
-    let active = true
-    void window.api.listMonthlyFlows(month.year, month.month).then((result) => {
-      if (!active) return
-      if (result.ok) setMonthly(result.data)
-      else setError(result.error.message)
-    })
+  }, [view, target, loaded])
+  const refresh = useExternalRefresh(async () => {
+    const [flowResult, accountResult, cardResult, purposeResult, monthlyResult] = await Promise.all(
+      [
+        window.api.listFlows(true),
+        window.api.listAccounts(true),
+        window.api.listCards(true),
+        window.api.listPurposes(),
+        window.api.listMonthlyFlows(month.year, month.month)
+      ]
+    )
     return () => {
-      active = false
-    }
-  }, [month, monthlyRevision])
-  const refresh = async (): Promise<void> => {
-    const [flowResult, accountResult, cardResult, purposeResult] = await Promise.all([
-      window.api.listFlows(true),
-      window.api.listAccounts(true),
-      window.api.listCards(true),
-      window.api.listPurposes()
-    ])
-    if (flowResult.ok) setFlows(flowResult.data)
-    else setError(flowResult.error.message)
-    if (accountResult.ok) setAccounts(accountResult.data)
-    else setError(accountResult.error.message)
-    if (cardResult.ok) setCards(cardResult.data)
-    else setError(cardResult.error.message)
-    if (purposeResult.ok) setPurposes(purposeResult.data)
-    else setError(purposeResult.error.message)
-    if (flowResult.ok && accountResult.ok && cardResult.ok && purposeResult.ok) setLoaded(true)
-    setMonthlyRevision((value) => value + 1)
-  }
-  useEffect(() => {
-    void Promise.all([
-      window.api.listFlows(true),
-      window.api.listAccounts(true),
-      window.api.listCards(true),
-      window.api.listPurposes()
-    ]).then(([flowResult, accountResult, cardResult, purposeResult]) => {
       if (flowResult.ok) setFlows(flowResult.data)
       else setError(flowResult.error.message)
       if (accountResult.ok) setAccounts(accountResult.data)
@@ -433,9 +408,11 @@ export default function FlowsPage({ target, clearTarget }: PageProps): React.JSX
       else setError(cardResult.error.message)
       if (purposeResult.ok) setPurposes(purposeResult.data)
       else setError(purposeResult.error.message)
+      if (monthlyResult.ok) setMonthly(monthlyResult.data)
+      else setError(monthlyResult.error.message)
       if (flowResult.ok && accountResult.ok && cardResult.ok && purposeResult.ok) setLoaded(true)
-    })
-  }, [])
+    }
+  }, [month.year, month.month])
   const saved = (): void => {
     setEditing(null)
     setEnding(null)

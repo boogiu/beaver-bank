@@ -12,6 +12,7 @@ import FlowsPage from './pages/FlowsPage'
 import DashboardPage from './pages/DashboardPage'
 import { getReducedMotion } from './hooks/useReducedMotion'
 import { DamScene } from './components/DamScene'
+import { ExternalRefreshProvider } from './hooks/useExternalRefresh'
 
 export type PageId = string
 export type NavigationTarget = {
@@ -112,7 +113,9 @@ function App(): React.JSX.Element {
           if (target) setTarget(null)
         }}
       >
-        <Current target={target} clearTarget={() => setTarget(null)} navigate={navigate} />
+        <ExternalRefreshProvider key={page}>
+          <Current target={target} clearTarget={() => setTarget(null)} navigate={navigate} />
+        </ExternalRefreshProvider>
       </main>
     </div>
   )

@@ -229,6 +229,8 @@ export interface DashboardData {
 }
 
 export interface Api {
+  getDataGeneration(): Promise<number>
+  onDataChanged(listener: (generation: number) => void): () => void
   getDashboard(date?: string): Promise<Result<DashboardData>>
   listBalances(date?: string): Promise<Result<AccountBalance[]>>
   listPurposeAmounts(date?: string): Promise<Result<PurposeAmount[]>>

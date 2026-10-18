@@ -1,3 +1,4 @@
+import { useExternalRefresh } from '../hooks/useExternalRefresh'
 import { getReducedMotion } from '../hooks/useReducedMotion'
 import { Entrance } from '../components/Entrance'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -234,6 +235,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
 
   const [reduced] = useState(getReducedMotion)
   const firstLayout = useRef(true)
+  const preserveLayout = useRef(false)
   const detached = useRef(new Set<string>())
   const [loaded, setLoaded] = useState(false)
   const [purposes, setPurposes] = useState<Purpose[]>([])
@@ -253,24 +255,24 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
   const drag = useRef<{ id: string; startX: number; startY: number; moved: boolean } | null>(null)
   const pan = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null)
 
-  useEffect(() => {
-    Promise.all([
+  useExternalRefresh(async () => {
+    const [p, a, c, f] = await Promise.all([
       window.api.listPurposes(),
       window.api.listAccounts(true),
       window.api.listCards(true),
       window.api.listFlows()
     ])
-      .then(async ([p, a, c, f]) => {
-        await document.fonts.ready
-        if (p.ok && a.ok && c.ok && f.ok) {
-          setPurposes(p.data)
-          setAccounts(a.data)
-          setCards(c.data)
-          setFlows(f.data)
-          setLoaded(true)
-        } else setError('그래프 데이터를 읽지 못했습니다.')
-      })
-      .catch(() => setError('그래프 데이터를 읽지 못했습니다.'))
+    await document.fonts.ready
+    return () => {
+      if (p.ok && a.ok && c.ok && f.ok) {
+        preserveLayout.current = !firstLayout.current
+        setPurposes(p.data)
+        setAccounts(a.data)
+        setCards(c.data)
+        setFlows(f.data)
+        setLoaded(true)
+      } else setError('그래프 데이터를 읽지 못했습니다.')
+    }
   }, [])
   useEffect(() => {
     if (!region.current) return
@@ -328,6 +330,9 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
       }
     }
     let seed = nextLayoutSeed++
+    const preserve = preserveLayout.current
+    preserveLayout.current = false
+    const previous = new Map(model.current.map((node) => [node.id, node]))
     const random = (): number => {
       seed = (1664525 * seed + 1013904223) >>> 0
       return seed / 4294967296
@@ -431,11 +436,17 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
       boundary()
     }
     boundary()
+    if (preserve) {
+      for (const node of nodes) {
+        const old = previous.get(node.id)
+        if (old) Object.assign(node, { x: old.x, y: old.y, vx: 0, vy: 0 })
+      }
+    }
     model.current = nodes
     simulation.current = sim
     const unfold = firstLayout.current && !reduced
     firstLayout.current = false
-    detached.current.clear()
+    if (!preserve) detached.current.clear()
     const cx = (Math.min(...nodes.map((n) => n.x!)) + Math.max(...nodes.map((n) => n.x!))) / 2
     const cy = (Math.min(...nodes.map((n) => n.y!)) + Math.max(...nodes.map((n) => n.y!))) / 2
     let started = 0,
@@ -462,7 +473,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
     queueMicrotask(() => {
       if (cancelled) return
       started = performance.now()
-      fit(nodes)
+      if (!preserve) fit(nodes)
       draw()
       if (unfold)
         timer = window.setTimeout(() => {

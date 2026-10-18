@@ -1,3 +1,4 @@
+import { useExternalRefresh } from '../hooks/useExternalRefresh'
 import { Entrance } from '../components/Entrance'
 import { useEffect, useState } from 'react'
 import { CARD_TYPES } from '@shared/domain'
@@ -146,6 +147,7 @@ function CardForm({
 export default function CardsPage({ target }: PageProps): React.JSX.Element {
   let entranceIndex = 0
 
+  const [turns, setTurns] = useState<Record<number, number>>({})
   const [loaded, setLoaded] = useState(false)
   const [flows, setFlows] = useState<Flow[] | null>(null)
   const [cards, setCards] = useState<Card[]>([])
@@ -155,27 +157,14 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
   const [editing, setEditing] = useState<Card | null | 'add'>(null)
   const [closing, setClosing] = useState<Card | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const refresh = async (): Promise<void> => {
-    const [cardResult, accountResult, purposeResult] = await Promise.all([
-      window.api.listCards(true),
-      window.api.listAccounts(true),
-      window.api.listPurposes()
-    ])
-    if (cardResult.ok) setCards(cardResult.data)
-    else setError(cardResult.error.message)
-    if (accountResult.ok) setAccounts(accountResult.data)
-    else setError(accountResult.error.message)
-    if (purposeResult.ok) setPurposes(purposeResult.data)
-    else setError(purposeResult.error.message)
-    if (cardResult.ok && accountResult.ok && purposeResult.ok) setLoaded(true)
-  }
-  useEffect(() => {
-    void Promise.all([
+  const refresh = useExternalRefresh(async () => {
+    const [cardResult, accountResult, purposeResult, flowResult] = await Promise.all([
       window.api.listCards(true),
       window.api.listAccounts(true),
       window.api.listPurposes(),
       window.api.listFlows()
-    ]).then(([cardResult, accountResult, purposeResult, flowResult]) => {
+    ])
+    return () => {
       if (cardResult.ok) setCards(cardResult.data)
       else setError(cardResult.error.message)
       if (accountResult.ok) setAccounts(accountResult.data)
@@ -185,12 +174,12 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
       if (flowResult.ok) setFlows(flowResult.data)
       else setError(flowResult.error.message)
       if (cardResult.ok && accountResult.ok && purposeResult.ok) setLoaded(true)
-    })
+    }
   }, [])
   useEffect(() => {
     if (target?.kind === 'card')
       document.getElementById(`card-${target.id}`)?.scrollIntoView({ block: 'center' })
-  }, [target, cards, showInactive])
+  }, [target, loaded, showInactive])
   const close = async (): Promise<void> => {
     if (!closing) return
     const result = await window.api.closeCard(closing.id)
@@ -238,6 +227,10 @@ export default function CardsPage({ target }: PageProps): React.JSX.Element {
               return (
                 <Entrance order={entranceIndex++} wrap key={card.id}>
                   <PaymentCardUnit
+                    turns={turns[card.id] ?? 0}
+                    onTurn={() =>
+                      setTurns((old) => ({ ...old, [card.id]: (old[card.id] ?? 0) + 1 }))
+                    }
                     card={card}
                     purposeColor={purpose?.color}
                     flows={flows}

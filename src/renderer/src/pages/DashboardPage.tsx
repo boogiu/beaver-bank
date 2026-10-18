@@ -1,7 +1,8 @@
+import { useExternalRefresh } from '../hooks/useExternalRefresh'
 import { AnimatedAmount } from '../components/AnimatedAmount'
 import { useVisibleValue } from '../hooks/useVisibleOnce'
 import { Entrance } from '../components/Entrance'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { DashboardData } from '@shared/ipc'
 import type { PageProps } from '../App'
 import { Button, EmptyState, Icon } from '../components/Ui'
@@ -46,23 +47,19 @@ export default function DashboardPage({ navigate }: PageProps): React.JSX.Elemen
 
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  useEffect(() => {
-    let active = true
-    window.api
-      .getDashboard()
-      .then((result) => {
-        if (!active) return
-        if (result.ok) setData(result.data)
-        else setError(result.error.message)
-      })
-      .catch(() => {
-        if (active) setError('대시보드를 불러오지 못했습니다. 다시 시도해 주세요.')
-      })
-    return () => {
-      active = false
+  useExternalRefresh(async () => {
+    try {
+      const result = await window.api.getDashboard()
+      return () => {
+        if (result.ok) {
+          setData(result.data)
+          setError(null)
+        } else setError(result.error.message)
+      }
+    } catch {
+      return () => setError('대시보드를 불러오지 못했습니다. 다시 시도해 주세요.')
     }
   }, [])
-
   return (
     <>
       <Entrance order={entranceIndex++}>

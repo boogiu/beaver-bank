@@ -1,5 +1,6 @@
+import { useExternalRefresh } from '../hooks/useExternalRefresh'
 import { Entrance } from '../components/Entrance'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
 import type { ApiError, Purpose, PurposeAmount } from '@shared/ipc'
 import type { PageProps } from '../App'
@@ -79,24 +80,23 @@ export default function PurposesPage({ target }: PageProps): React.JSX.Element {
   const [removing, setRemoving] = useState<Purpose | null>(null)
   const [error, setError] = useState<string | null>(null)
   const dragged = useRef<number | null>(null)
-  const refresh = useCallback(async (): Promise<void> => {
+  const refresh = useExternalRefresh(async () => {
     const [result, amountResult] = await Promise.all([
       window.api.listPurposes(),
       window.api.listPurposeAmounts()
     ])
-    if (result.ok) setItems(result.data)
-    else setError(result.error.message)
-    if (amountResult.ok) setAmounts(amountResult.data)
-    else setError(amountResult.error.message)
-    if (result.ok && amountResult.ok) setLoaded(true)
+    return () => {
+      if (result.ok) setItems(result.data)
+      else setError(result.error.message)
+      if (amountResult.ok) setAmounts(amountResult.data)
+      else setError(amountResult.error.message)
+      if (result.ok && amountResult.ok) setLoaded(true)
+    }
   }, [])
-  useEffect(() => {
-    void Promise.resolve().then(refresh)
-  }, [refresh])
   useEffect(() => {
     if (target?.kind !== 'purpose') return
     document.getElementById(`purpose-${target.id}`)?.scrollIntoView({ block: 'center' })
-  }, [target, items])
+  }, [target, loaded])
   const remove = async (): Promise<void> => {
     if (!removing) return
     const result = await window.api.deletePurpose(removing.id)

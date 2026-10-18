@@ -1,6 +1,7 @@
+import { useExternalRefresh } from '../hooks/useExternalRefresh'
 import { Entrance } from '../components/Entrance'
 import { AmountInput } from '../components/AmountInput'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { ACCOUNT_TYPES, INTEREST_TYPES, TAX_TYPES } from '@shared/domain'
 import type {
@@ -233,6 +234,7 @@ function AccountForm({
 export default function AccountsPage({ target }: PageProps): React.JSX.Element {
   let entranceIndex = 0
 
+  const [opened, setOpened] = useState<Record<number, boolean>>({})
   const [loaded, setLoaded] = useState(false)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [purposes, setPurposes] = useState<Purpose[]>([])
@@ -245,7 +247,7 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
   const [editing, setEditing] = useState<Account | null | 'add'>(null)
   const [closing, setClosing] = useState<Account | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const refresh = useCallback(async (): Promise<void> => {
+  const refresh = useExternalRefresh(async () => {
     const [accountResult, purposeResult, balanceResult, amountResult, flowResult, dashboardResult] =
       await Promise.all([
         window.api.listAccounts(true),
@@ -255,28 +257,27 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
         window.api.listFlows(),
         window.api.getDashboard()
       ])
-    setError(null)
-    setFlows(flowResult.ok ? flowResult.data : null)
-    if (!flowResult.ok) setError(flowResult.error.message)
-    setSavings(dashboardResult.ok ? dashboardResult.data.savings : [])
-    if (!dashboardResult.ok) setError(dashboardResult.error.message)
-    if (accountResult.ok) setAccounts(accountResult.data)
-    else setError(accountResult.error.message)
-    if (purposeResult.ok) setPurposes(purposeResult.data)
-    else setError(purposeResult.error.message)
-    if (balanceResult.ok) setBalances(balanceResult.data)
-    else setError(balanceResult.error.message)
-    if (amountResult.ok) setAmounts(amountResult.data)
-    else setError(amountResult.error.message)
-    setLoaded(accountResult.ok && purposeResult.ok && balanceResult.ok && amountResult.ok)
+    return () => {
+      setError(null)
+      setFlows(flowResult.ok ? flowResult.data : null)
+      if (!flowResult.ok) setError(flowResult.error.message)
+      setSavings(dashboardResult.ok ? dashboardResult.data.savings : [])
+      if (!dashboardResult.ok) setError(dashboardResult.error.message)
+      if (accountResult.ok) setAccounts(accountResult.data)
+      else setError(accountResult.error.message)
+      if (purposeResult.ok) setPurposes(purposeResult.data)
+      else setError(purposeResult.error.message)
+      if (balanceResult.ok) setBalances(balanceResult.data)
+      else setError(balanceResult.error.message)
+      if (amountResult.ok) setAmounts(amountResult.data)
+      else setError(amountResult.error.message)
+      setLoaded(accountResult.ok && purposeResult.ok && balanceResult.ok && amountResult.ok)
+    }
   }, [])
-  useEffect(() => {
-    void Promise.resolve().then(refresh)
-  }, [refresh])
   useEffect(() => {
     if (target?.kind === 'account')
       document.getElementById(`account-${target.id}`)?.scrollIntoView({ block: 'center' })
-  }, [target, accounts, showInactive])
+  }, [target, loaded, showInactive])
   const close = async (): Promise<void> => {
     if (!closing) return
     const result = await window.api.closeAccount(closing.id)
@@ -346,6 +347,10 @@ export default function AccountsPage({ target }: PageProps): React.JSX.Element {
                     {members.map((account) => (
                       <Entrance order={entranceIndex++} wrap key={account.id}>
                         <AccountPassbook
+                          open={opened[account.id] ?? false}
+                          onOpenChange={(open) =>
+                            setOpened((old) => ({ ...old, [account.id]: open }))
+                          }
                           account={account}
                           balance={balances.find((row) => row.accountId === account.id)}
                           purpose={purposes.find((purpose) => purpose.id === account.purposeId)}

@@ -4,6 +4,15 @@ import type { Api } from '../shared/ipc'
 
 // renderer에서 window.api로 쓰는 main 프로세스 기능
 const api: Api = {
+  getDataGeneration: () => ipcRenderer.invoke('data:generation'),
+  onDataChanged: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, generation: number): void =>
+      listener(generation)
+    ipcRenderer.on('data:changed', receive)
+    return () => {
+      ipcRenderer.removeListener('data:changed', receive)
+    }
+  },
   getDashboard: (date) => ipcRenderer.invoke('dashboard:get', date),
   listBalances: (date) => ipcRenderer.invoke('balance:list', date),
   listPurposeAmounts: (date) => ipcRenderer.invoke('balance:purposes', date),

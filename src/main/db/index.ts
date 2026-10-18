@@ -43,6 +43,10 @@ export function closeDatabase(): void {
   db = null
 }
 
+export function getDataVersion(): number | null {
+  return sqlite ? (sqlite.pragma('data_version', { simple: true }) as number) : null
+}
+
 export function getDbStatus(): DbStatus {
   if (!sqlite) throw new Error('DB가 열려 있지 않습니다.')
   const conn = sqlite

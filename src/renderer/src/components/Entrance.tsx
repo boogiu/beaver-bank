@@ -1,6 +1,7 @@
 import { cloneElement, useEffect, useState } from 'react'
 import type { CSSProperties, ReactElement } from 'react'
 import { getReducedMotion } from '../hooks/useReducedMotion'
+import { useExternalEntrance } from '../hooks/useExternalRefresh'
 
 type ChildProps = { className?: string; style?: CSSProperties; 'data-entrance'?: boolean }
 
@@ -15,7 +16,8 @@ export function Entrance({
   children: ReactElement<ChildProps>
 }): React.JSX.Element {
   const [delay] = useState(() => Math.min(order * 0.04, 0.3))
-  const [animate, setAnimate] = useState(() => !getReducedMotion())
+  const allowEntrance = useExternalEntrance()
+  const [animate, setAnimate] = useState(() => allowEntrance && !getReducedMotion())
   useEffect(() => {
     if (!animate) return
     // 끝난 animation 이름을 제거해야 DOM 재정렬 때 브라우저가 다시 재생하지 않는다.

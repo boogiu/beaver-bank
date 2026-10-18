@@ -1,5 +1,6 @@
+import { useExternalRefresh } from '../hooks/useExternalRefresh'
 import { Entrance } from '../components/Entrance'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { DbStatus } from '@shared/ipc'
 
 const TABLE_LABELS: Record<string, string> = {
@@ -17,11 +18,18 @@ export default function InfoPage(): React.JSX.Element {
 
   const [status, setStatus] = useState<DbStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
-  useEffect(() => {
-    window.api
-      .getDbStatus()
-      .then((result) => (result.ok ? setStatus(result.data) : setError(result.error.message)))
-      .catch(() => setError('DB 상태를 읽지 못했습니다.'))
+  useExternalRefresh(async () => {
+    try {
+      const result = await window.api.getDbStatus()
+      return () => {
+        if (result.ok) {
+          setStatus(result.data)
+          setError(null)
+        } else setError(result.error.message)
+      }
+    } catch {
+      return () => setError('DB 상태를 읽지 못했습니다.')
+    }
   }, [])
   return (
     <>
