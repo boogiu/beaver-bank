@@ -9,4 +9,4 @@ export const noDatabaseMessage = (source: Options['source']): string =>
     ? '데모 데이터가 없습니다. 저장소에서 npm run demo를 한 번 실행한 뒤 다시 시도해 주세요.'
     : 'BeaverBank 데이터가 없습니다. 앱을 한 번 실행한 뒤 다시 시도해 주세요.'
 export const instructions = (options: Options): string =>
-  `BeaverBank는 용도별 계좌와 정기 흐름으로 돈을 관리하는 앱이며 건별 지출 가계부가 아닙니다. ${options.source === 'demo' ? '데모 데이터' : '실제 데이터'}, 읽기 전용, 메모 ${options.memos ? '켜짐' : '꺼짐'}입니다. 금액은 원 단위 정수, 날짜는 YYYY-MM-DD, 대상은 1 이상의 정수 id로 가리킵니다. ${notice}`
+  `BeaverBank는 용도별 계좌와 정기 흐름으로 돈을 관리하는 앱이며 건별 지출 가계부가 아닙니다. ${options.source === 'demo' ? '데모 데이터' : '실제 데이터'}, ${options.write ? '쓰기 켜짐' : '읽기 전용'}, 메모 ${options.memos ? '켜짐' : '꺼짐'}입니다. 금액은 원 단위 정수, 날짜는 YYYY-MM-DD, 대상은 1 이상의 정수 id로 가리킵니다. ${options.write ? '쓰기 도구를 실행하기 전에 사용자에게 바꿀 내용을 설명하고 동의를 받으세요. ' : ''}${notice}`

@@ -2,6 +2,7 @@ import type { JSONRPCMessage, Transport } from '@modelcontextprotocol/server'
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import type { Options } from './options'
 import { schemas, type ToolName } from './tools'
+import { writeSchemas, type WriteName } from './write-tools'
 
 // 공개 transport 경계에서 같은 입력 스키마를 검사한다. 규격 협상과 오류 생성은 SDK가 맡는다.
 export function createStdio(options: Options): Transport {
@@ -14,8 +15,16 @@ export function createStdio(options: Options): Transport {
       wire.onmessage = (message) => {
         if ('method' in message && message.method === 'tools/call' && 'id' in message) {
           const name = message.params?.name
-          if (typeof name === 'string' && Object.hasOwn(schemas, name)) {
-            const result = schemas[name as ToolName].safeParse(
+          const schema =
+            typeof name !== 'string'
+              ? undefined
+              : Object.hasOwn(schemas, name)
+                ? schemas[name as ToolName]
+                : options.write && Object.hasOwn(writeSchemas, name)
+                  ? writeSchemas[name as WriteName]
+                  : undefined
+          if (schema) {
+            const result = schema.safeParse(
               message.params?.arguments === undefined ? {} : message.params.arguments
             )
             if (!result.success) {

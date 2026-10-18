@@ -4,16 +4,18 @@ import { isAbsolute, join } from 'node:path'
 export interface Options {
   source: 'demo' | 'real'
   memos: boolean
+  write: boolean
   check: boolean
   root: string
   path: string
   displayFolder: string
 }
 export const usage =
-  '허용 옵션: --data demo|real, --memos, --data-root <존재하는 절대 폴더>, --check'
+  '허용 옵션: --data demo|real, --write, --memos, --data-root <존재하는 절대 폴더>, --check'
 export function parseOptions(args: string[], env = process.env): Options {
   let source: Options['source'] = 'demo'
   let memos = false
+  let write = false
   let check = false
   let dataRoot: string | undefined
   for (let i = 0; i < args.length; i++) {
@@ -27,6 +29,9 @@ export function parseOptions(args: string[], env = process.env): Options {
       }
       case '--memos':
         memos = true
+        break
+      case '--write':
+        write = true
         break
       case '--check':
         check = true
@@ -53,6 +58,7 @@ export function parseOptions(args: string[], env = process.env): Options {
   return {
     source,
     memos,
+    write,
     check,
     root,
     path: join(root, folder, 'beaverbank-dev.sqlite'),

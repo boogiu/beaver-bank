@@ -1,5 +1,11 @@
 import { and, asc, eq, sql } from 'drizzle-orm'
-import { ACCOUNT_TYPES, CARD_TYPES, INTEREST_TYPES, TAX_TYPES } from '../../shared/domain'
+import {
+  ACCOUNT_TYPES,
+  CARD_TYPES,
+  INTEREST_TYPES,
+  TAX_TYPES,
+  PURPOSE_COLORS
+} from '../../shared/domain'
 import {
   compareOccurrences,
   isRealDate,
@@ -63,6 +69,12 @@ export function withDatabase<T>(database: AppDatabase, work: () => T): T {
   }
 }
 
+// 최초 조회·검증 전에 쓰기 잠금을 얻어 WAL 읽기 잠금 승격 충돌을 막는다.
+// attempt는 이 함수 밖에서 오류를 결과로 바꿔 rollback을 보존한다.
+export function withWriteTransaction<T>(work: () => T): T {
+  return openDatabase().transaction((tx) => withDatabase(tx, work), { behavior: 'immediate' })
+}
+
 class ServiceError extends Error {
   constructor(
     public kind: ApiError['kind'],
@@ -80,6 +92,22 @@ const missing = (field?: string): never => {
 }
 const validId = (id: number): void => {
   if (!Number.isSafeInteger(id) || id < 1) invalid('id', '올바른 항목을 선택해 주세요.')
+}
+export function requirePurpose(id: number): Purpose {
+  validId(id)
+  return listPurposes().find((item) => item.id === id) ?? missing()
+}
+export function requireAccount(id: number): Account {
+  validId(id)
+  return listAccounts(true).find((item) => item.id === id) ?? missing()
+}
+export function requireCard(id: number): Card {
+  validId(id)
+  return listCards(true).find((item) => item.id === id) ?? missing()
+}
+export function requireFlow(id: number): Flow {
+  validId(id)
+  return listFlows(true).find((item) => item.id === id) ?? missing()
 }
 const name = (value: string, field: string, label: string, max: number): string => {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > max)
@@ -259,7 +287,10 @@ export function addPurpose(input: PurposeInput): Purpose {
 function validatePurpose(input: PurposeInput, id?: number): PurposeInput {
   if (!input || typeof input !== 'object') invalid('name', '용도 정보를 입력해 주세요.')
   const cleaned = { name: name(input.name, 'name', '용도 이름', 20), color: input.color }
-  if (typeof cleaned.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(cleaned.color))
+  if (
+    typeof cleaned.color !== 'string' ||
+    !PURPOSE_COLORS.some((color) => color.toLowerCase() === cleaned.color.toLowerCase())
+  )
     invalid('color', '팔레트에서 색을 선택해 주세요.')
   const existing = openDatabase()
     .select({ id: purposes.id })

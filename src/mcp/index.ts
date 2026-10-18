@@ -11,7 +11,7 @@ console.log = console.info = console.warn = console.debug = console.error.bind(c
 function main(): void {
   const options = parseOptions(process.argv.slice(2))
   console.error(
-    `${options.source === 'demo' ? '데모 데이터' : '실제 데이터'} · 읽기 전용 · 메모 ${options.memos ? '켜짐' : '꺼짐'} · ${options.path}`
+    `${options.source === 'demo' ? '데모 데이터' : '실제 데이터'} · ${options.write ? '쓰기 켜짐' : '읽기 전용'} · 메모 ${options.memos ? '켜짐' : '꺼짐'} · ${options.path}`
   )
   if (options.source === 'real') console.error(notice)
   if (options.check) {
@@ -23,7 +23,7 @@ function main(): void {
     }
     const status = result.data
     process.stdout.write(
-      `데이터 대상: ${options.source === 'demo' ? '데모 데이터' : '실제 데이터'}\n쓰기: 읽기 전용\n메모: ${options.memos ? '켜짐' : '꺼짐'}\nDB 경로: ${options.path}\nDB 상태: ${status.database.state}\n${JSON.stringify({ ...status, database: { ...status.database, path: options.path } }, null, 2)}\n`
+      `데이터 대상: ${options.source === 'demo' ? '데모 데이터' : '실제 데이터'}\n쓰기: ${options.write ? '켜짐' : '읽기 전용'}\n메모: ${options.memos ? '켜짐' : '꺼짐'}\nDB 경로: ${options.path}\nDB 상태: ${status.database.state}\n${JSON.stringify({ ...status, database: { ...status.database, path: options.path } }, null, 2)}\n`
     )
     process.exitCode = status.database.state === 'ready' ? 0 : 1
   } else {

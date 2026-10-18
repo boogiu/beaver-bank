@@ -1,6 +1,21 @@
 // DB와 화면이 함께 쓰는 도메인 상수.
 // 금액은 원 단위 정수, 날짜는 'YYYY-MM-DD' 문자열로 다룬다.
 
+export const PURPOSE_COLORS = [
+  '#397768',
+  '#346D82',
+  '#84723E',
+  '#4C7865',
+  '#566D7B',
+  '#8B6256',
+  '#9A684B',
+  '#4F6F97',
+  '#8E5868',
+  '#6F7B45',
+  '#4A7A83',
+  '#9A7244'
+] as const
+
 export const ACCOUNT_TYPES = [
   'checking', // 입출금
   'installment', // 적금

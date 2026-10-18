@@ -54,61 +54,83 @@ function registerIpc(): void {
     service.attempt(() => service.listBalanceSnapshots(accountId))
   )
   ipcMain.handle('balance:save', (_, input) =>
-    service.attempt(() => service.saveBalanceSnapshot(input))
+    service.attempt(() => service.withWriteTransaction(() => service.saveBalanceSnapshot(input)))
   )
   ipcMain.handle('balance:delete', (_, id) =>
-    service.attempt(() => service.deleteBalanceSnapshot(id))
+    service.attempt(() => service.withWriteTransaction(() => service.deleteBalanceSnapshot(id)))
   )
   ipcMain.handle('balance:before', (_, accountId, date) =>
     service.attempt(() => service.getBalanceBefore(accountId, date))
   )
   ipcMain.handle('db:status', () => service.attempt(getDbStatus))
   ipcMain.handle('purpose:list', () => service.attempt(service.listPurposes))
-  ipcMain.handle('purpose:add', (_, input) => service.attempt(() => service.addPurpose(input)))
-  ipcMain.handle('purpose:update', (_, id, input) =>
-    service.attempt(() => service.updatePurpose(id, input))
+  ipcMain.handle('purpose:add', (_, input) =>
+    service.attempt(() => service.withWriteTransaction(() => service.addPurpose(input)))
   )
-  ipcMain.handle('purpose:delete', (_, id) => service.attempt(() => service.deletePurpose(id)))
-  ipcMain.handle('purpose:reorder', (_, ids) => service.attempt(() => service.reorderPurposes(ids)))
+  ipcMain.handle('purpose:update', (_, id, input) =>
+    service.attempt(() => service.withWriteTransaction(() => service.updatePurpose(id, input)))
+  )
+  ipcMain.handle('purpose:delete', (_, id) =>
+    service.attempt(() => service.withWriteTransaction(() => service.deletePurpose(id)))
+  )
+  ipcMain.handle('purpose:reorder', (_, ids) =>
+    service.attempt(() => service.withWriteTransaction(() => service.reorderPurposes(ids)))
+  )
   ipcMain.handle('account:list', (_, includeInactive) =>
     service.attempt(() => service.listAccounts(includeInactive))
   )
-  ipcMain.handle('account:add', (_, input) => service.attempt(() => service.addAccount(input)))
+  ipcMain.handle('account:add', (_, input) =>
+    service.attempt(() => service.withWriteTransaction(() => service.addAccount(input)))
+  )
   ipcMain.handle('account:update', (_, id, input) =>
-    service.attempt(() => service.updateAccount(id, input))
+    service.attempt(() => service.withWriteTransaction(() => service.updateAccount(id, input)))
   )
   ipcMain.handle('account:close', (_, id) =>
-    service.attempt(() => service.setAccountActive(id, false))
+    service.attempt(() => service.withWriteTransaction(() => service.setAccountActive(id, false)))
   )
   ipcMain.handle('account:restore', (_, id) =>
-    service.attempt(() => service.setAccountActive(id, true))
+    service.attempt(() => service.withWriteTransaction(() => service.setAccountActive(id, true)))
   )
   ipcMain.handle('card:list', (_, includeInactive) =>
     service.attempt(() => service.listCards(includeInactive))
   )
-  ipcMain.handle('card:add', (_, input) => service.attempt(() => service.addCard(input)))
-  ipcMain.handle('card:update', (_, id, input) =>
-    service.attempt(() => service.updateCard(id, input))
+  ipcMain.handle('card:add', (_, input) =>
+    service.attempt(() => service.withWriteTransaction(() => service.addCard(input)))
   )
-  ipcMain.handle('card:close', (_, id) => service.attempt(() => service.setCardActive(id, false)))
-  ipcMain.handle('card:restore', (_, id) => service.attempt(() => service.setCardActive(id, true)))
+  ipcMain.handle('card:update', (_, id, input) =>
+    service.attempt(() => service.withWriteTransaction(() => service.updateCard(id, input)))
+  )
+  ipcMain.handle('card:close', (_, id) =>
+    service.attempt(() => service.withWriteTransaction(() => service.setCardActive(id, false)))
+  )
+  ipcMain.handle('card:restore', (_, id) =>
+    service.attempt(() => service.withWriteTransaction(() => service.setCardActive(id, true)))
+  )
   ipcMain.handle('flow:list', (_, includeEnded) =>
     service.attempt(() => service.listFlows(includeEnded))
   )
-  ipcMain.handle('flow:add', (_, input) => service.attempt(() => service.addFlow(input)))
+  ipcMain.handle('flow:add', (_, input) =>
+    service.attempt(() => service.withWriteTransaction(() => service.addFlow(input)))
+  )
   ipcMain.handle('flow:update', (_, id, input, effectiveStartDate) =>
-    service.attempt(() => service.updateFlow(id, input, effectiveStartDate))
+    service.attempt(() =>
+      service.withWriteTransaction(() => service.updateFlow(id, input, effectiveStartDate))
+    )
   )
   ipcMain.handle('flow:end', (_, id, endDate) =>
-    service.attempt(() => service.endFlow(id, endDate))
+    service.attempt(() => service.withWriteTransaction(() => service.endFlow(id, endDate)))
   )
-  ipcMain.handle('flow:resume', (_, id) => service.attempt(() => service.resumeFlow(id)))
-  ipcMain.handle('flow:delete', (_, id) => service.attempt(() => service.deleteFlow(id)))
+  ipcMain.handle('flow:resume', (_, id) =>
+    service.attempt(() => service.withWriteTransaction(() => service.resumeFlow(id)))
+  )
+  ipcMain.handle('flow:delete', (_, id) =>
+    service.attempt(() => service.withWriteTransaction(() => service.deleteFlow(id)))
+  )
   ipcMain.handle('flow:monthly', (_, year, month) =>
     service.attempt(() => service.listMonthlyFlows(year, month))
   )
   ipcMain.handle('flow:override', (_, input) =>
-    service.attempt(() => service.saveFlowOverride(input))
+    service.attempt(() => service.withWriteTransaction(() => service.saveFlowOverride(input)))
   )
 }
 

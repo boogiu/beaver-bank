@@ -13,7 +13,11 @@ export interface DatabaseState {
   migrations: { applied: number; expected: number }
   counts: Record<string, number> | null
 }
-export function withReadDatabase<T>(options: Options, work: (state: DatabaseState) => T): T {
+function withConnection<T>(
+  options: Options,
+  writable: boolean,
+  work: (state: DatabaseState, sqlite: Database.Database | null) => T
+): T {
   const state: DatabaseState = {
     state: 'no_database',
     message: noDatabaseMessage(options.source),
@@ -23,11 +27,16 @@ export function withReadDatabase<T>(options: Options, work: (state: DatabaseStat
   try {
     statSync(options.path)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return work(state)
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return work(state, null)
     throw error
   }
-  const sqlite = new Database(options.path, { readonly: true, fileMustExist: true })
+  const sqlite = new Database(options.path, {
+    readonly: !writable,
+    fileMustExist: true,
+    timeout: 5000
+  })
   try {
+    if (writable) sqlite.pragma('foreign_keys = ON')
     const records = readMigrationRecords(sqlite)
     state.migrations.applied = records?.length ?? 0
     const matches =
@@ -40,10 +49,20 @@ export function withReadDatabase<T>(options: Options, work: (state: DatabaseStat
       )
     state.state = matches ? 'ready' : 'schema_mismatch'
     state.message = matches ? null : mismatchMessage
-    if (!matches) return work(state)
+    if (!matches) return work(state, sqlite)
     state.counts = Object.fromEntries(readTableCounts(sqlite).map(({ name, rows }) => [name, rows]))
-    return withDatabase(drizzle(sqlite, { schema }), () => work(state))
+    return withDatabase(drizzle(sqlite, { schema }), () => work(state, sqlite))
   } finally {
     sqlite.close()
   }
+}
+
+export function withReadDatabase<T>(options: Options, work: (state: DatabaseState) => T): T {
+  return withConnection(options, false, work)
+}
+export function withWriteDatabase<T>(
+  options: Options,
+  work: (state: DatabaseState, sqlite: Database.Database | null) => T
+): T {
+  return withConnection(options, true, work)
 }

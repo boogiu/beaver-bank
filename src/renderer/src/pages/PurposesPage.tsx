@@ -6,20 +6,7 @@ import type { PageProps } from '../App'
 import { AddButton, Button, EmptyState, Icon, PurposeAmountLabel } from '../components/Ui'
 import { ConfirmModal, Field, Modal } from '../components/Modal'
 
-const PALETTE = [
-  '#397768',
-  '#346D82',
-  '#84723E',
-  '#4C7865',
-  '#566D7B',
-  '#8B6256',
-  '#9A684B',
-  '#4F6F97',
-  '#8E5868',
-  '#6F7B45',
-  '#4A7A83',
-  '#9A7244'
-]
+import { PURPOSE_COLORS } from '@shared/domain'
 
 function PurposeForm({
   value,
@@ -31,7 +18,7 @@ function PurposeForm({
   onSaved: () => void
 }): React.JSX.Element {
   const [name, setName] = useState(value?.name ?? '')
-  const [color, setColor] = useState(value?.color ?? PALETTE[0])
+  const [color, setColor] = useState(value?.color ?? PURPOSE_COLORS[0])
   const [error, setError] = useState<ApiError | null>(null)
   const save = async (): Promise<void> => {
     const result = value
@@ -61,7 +48,7 @@ function PurposeForm({
         </Field>
         <Field name="color" label="색상" error={error} wide>
           <div className="palette">
-            {PALETTE.map((item) => (
+            {PURPOSE_COLORS.map((item) => (
               <button
                 type="button"
                 key={item}

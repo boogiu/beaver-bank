@@ -28,7 +28,7 @@ export function openDatabase(): AppDatabase {
   if (db) return db
 
   mkdirSync(app.getPath('userData'), { recursive: true })
-  sqlite = new Database(getDbPath())
+  sqlite = new Database(getDbPath(), { timeout: 5000 })
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('foreign_keys = ON')
 
