@@ -5,6 +5,9 @@ import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { readMigrationRecords } from './db/status'
 import type { ChatSource } from '../shared/chat'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
+import * as schema from './db/schema'
+import { withDatabase, listPurposes, listAccounts, listCards, listFlows } from './db/service'
 
 export function checkChatData(source: ChatSource): string | null {
   const path = join(
@@ -39,6 +42,37 @@ export function checkChatData(source: ChatSource): string | null {
       : mismatch
   } catch {
     return mismatch
+  } finally {
+    database?.close()
+  }
+}
+
+export function readChatNames(source: ChatSource): Record<string, Record<string, string>> {
+  let database: Database.Database | undefined
+  try {
+    database = new Database(
+      join(
+        app.getPath('appData'),
+        source === 'demo' ? 'BeaverBank-demo' : 'BeaverBank',
+        'beaverbank-dev.sqlite'
+      ),
+      { readonly: true, fileMustExist: true, timeout: 1000 }
+    )
+    return withDatabase(drizzle(database, { schema }), () =>
+      Object.fromEntries(
+        Object.entries({
+          purpose: listPurposes(),
+          account: listAccounts(true),
+          card: listCards(true),
+          flow: listFlows(true)
+        }).map(([kind, rows]) => [
+          kind,
+          Object.fromEntries(rows.map((row) => [String(row.id), row.name]))
+        ])
+      )
+    )
+  } catch {
+    return {}
   } finally {
     database?.close()
   }

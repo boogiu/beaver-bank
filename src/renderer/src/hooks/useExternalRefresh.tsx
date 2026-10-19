@@ -85,6 +85,7 @@ export function ExternalRefreshProvider({ children }: { children: ReactNode }): 
 }
 
 export function useExternalModal(): void {
+  // 페이지 provider 안의 팝업만 페이지 갱신을 미룬다. 형제인 채팅 패널 팝업은 세지 않는다.
   const coordinator = useContext(Context)
   useLayoutEffect(() => coordinator?.openModal(), [coordinator])
 }

@@ -11,16 +11,20 @@ export function ChatDialog({
   onClose,
   onConfirm
 }: {
-  kind: 'new' | 'real'
+  kind: 'new' | 'real' | 'write'
   onClose: () => void
   onConfirm: () => void | Promise<void>
 }): React.JSX.Element {
   return (
     <Modal
       title={
-        kind === 'new' ? '지금 대화를 지우고 새로 시작할까요?' : '실제 데이터를 AI에 연결할까요?'
+        kind === 'new'
+          ? '지금 대화를 지우고 새로 시작할까요?'
+          : kind === 'write'
+            ? '실제 데이터에 기입을 허용할까요?'
+            : '실제 데이터를 AI에 연결할까요?'
       }
-      submitLabel={kind === 'new' ? '새 대화' : '실제 데이터 연결'}
+      submitLabel={kind === 'new' ? '새 대화' : kind === 'write' ? '기입 허용' : '실제 데이터 연결'}
       onClose={onClose}
       onSubmit={onConfirm}
       focusedButtonsOnly
@@ -32,6 +36,8 @@ export function ChatDialog({
             <ChatRichText text={privacyNotice} />
             <p>연결한 뒤에도 기입은 따로 켜야 하고, 기입마다 확인을 받습니다.</p>
           </>
+        ) : kind === 'write' ? (
+          'AI가 실제 데이터의 용도·계좌·카드·정기 흐름·잔액 보정을 등록하거나 고칠 수 있게 됩니다. 기입마다 채팅창에서 확인을 받고, 첫 기입 전에 자동 백업을 만듭니다.'
         ) : (
           '지금 대화는 앱에 저장되지 않습니다.'
         )}

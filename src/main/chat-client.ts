@@ -15,7 +15,9 @@ import { StringDecoder } from 'node:string_decoder'
 import { constants, setPriority } from 'node:os'
 import { chatModels, type ChatSnapshot, type ChatRequest, type ChatReply } from '../shared/chat'
 import { readChatSettings, writeChatSettings } from './chat-settings'
-import { checkChatData } from './chat-data'
+import { checkChatData, readChatNames } from './chat-data'
+import { writeToolNames } from '../shared/chat-gate'
+import { ChatApproval } from './chat-approval'
 
 const instructions = [
   'BeaverBank는 용도별 계좌와 정기 흐름으로 돈을 관리하는 앱이고, 건별 지출 가계부가 아니다.',
@@ -246,6 +248,7 @@ export class ChatClient {
     epoch: randomUUID(),
     settings: readChatSettings(),
     source: 'demo',
+    writeEnabled: false,
     demo: process.argv.includes('--demo'),
     status: { state: 'unknown' },
     replies: []
@@ -259,6 +262,7 @@ export class ChatClient {
   private run?: {
     id: string
     process?: Managed
+    approval?: ChatApproval
     finish: (state: ChatReply['state'], error?: string, clear?: boolean) => Promise<void>
   }
   private runFolder = join(app.getPath('userData'), 'chat', 'run')
@@ -354,12 +358,7 @@ export class ChatClient {
           (parts[0] > 2 ||
             (parts[0] === 2 && (parts[1] > 1 || (parts[1] === 1 && parts[2] >= 284))))
         this.snapshot.status = {
-          state:
-            loggedIn && auth.code === 0
-              ? 'ready'
-              : loggedIn === false
-                ? 'login'
-                : 'unknown',
+          state: loggedIn && auth.code === 0 ? 'ready' : loggedIn === false ? 'login' : 'unknown',
           version,
           verified
         }
@@ -373,6 +372,31 @@ export class ChatClient {
     return this.checking
   }
   async request(request: ChatRequest): Promise<ChatSnapshot> {
+    if (!request || typeof request !== 'object' || typeof request.kind !== 'string')
+      return this.snapshot
+    if (
+      (request.kind === 'card-decision' || request.kind === 'card-received') &&
+      request.epoch === this.snapshot.epoch &&
+      request.runId === this.run?.id &&
+      typeof request.cardId === 'string'
+    ) {
+      const keys =
+        request.kind === 'card-decision'
+          ? ['kind', 'epoch', 'runId', 'cardId', 'decision']
+          : ['kind', 'epoch', 'runId', 'cardId']
+      if (Object.keys(request).every((key) => keys.includes(key))) {
+        if (request.kind === 'card-received') this.run?.approval?.received(request.cardId)
+        else if (request.decision === 'approve' || request.decision === 'reject')
+          this.run?.approval?.decide(request.cardId, request.decision)
+      }
+    }
+    if (
+      request.kind === 'write-enabled' &&
+      request.epoch === this.snapshot.epoch &&
+      !this.run &&
+      typeof request.enabled === 'boolean'
+    )
+      this.snapshot.writeEnabled = request.enabled
     if (request.kind === 'settings') {
       if (typeof request.open === 'boolean') this.snapshot.settings.open = request.open
       if (!this.run && request.model && chatModels.includes(request.model))
@@ -427,7 +451,10 @@ export class ChatClient {
       this.session = undefined
       this.snapshot.epoch = randomUUID()
       this.snapshot.replies = []
-      if (request.source) this.snapshot.source = request.source
+      if (request.source && request.source !== this.snapshot.source) {
+        this.snapshot.source = request.source
+        this.snapshot.writeEnabled = false
+      }
     }
     this.publish()
     return this.snapshot
@@ -452,6 +479,12 @@ export class ChatClient {
   private async start(reply: ChatReply): Promise<void> {
     const lifecycle = this.lifecycle
     const runId = randomUUID()
+    const source = this.snapshot.source
+    const writeEnabled = this.snapshot.writeEnabled
+    const allowedTools = [
+      ...readTools,
+      ...(writeEnabled ? writeToolNames.map((name) => `mcp__beaverbank-chat__${name}`) : [])
+    ]
     reply.runId = runId
     const files: string[] = []
     let task: Managed | undefined
@@ -459,9 +492,21 @@ export class ChatClient {
     let cleanup: Promise<void> | undefined
     let timer: ReturnType<typeof setInterval> | undefined
     let stderr = ''
+    let approval: ChatApproval | undefined
+    let initialized = false
+    let silence = 0
+    let lastTick = Date.now()
+    let paused = false
+    const updateSilence = (): void => {
+      const now = Date.now()
+      if (!paused) silence += now - lastTick
+      lastTick = now
+      paused = approval?.pending ?? false
+    }
     const finish = (state: ChatReply['state'], error?: string, clear = false): Promise<void> => {
       if (cleanup) return cleanup
       closed = true
+      approval?.cancel()
       clearInterval(timer)
       if (clear) reply.blocks = []
       reply.waiting = false
@@ -507,12 +552,36 @@ export class ChatClient {
         await finish('error', errors.node)
         return
       }
-      const dataError = checkChatData(this.snapshot.source)
+      const dataError = checkChatData(source)
       if (dataError) {
         await finish('error', dataError)
         return
       }
       const workspace = join(app.getPath('userData'), 'chat', 'workspace')
+      if (writeEnabled) {
+        approval = new ChatApproval(
+          { epoch: this.snapshot.epoch, replyId: reply.id, runId, source },
+          (card) => {
+            card.names = readChatNames(source)
+            reply.blocks.push(card)
+            reply.waiting = false
+          },
+          () => {
+            updateSilence()
+            this.publish()
+          },
+          () => !closed && initialized && this.run?.id === runId,
+          () => {
+            void finish('error', errors.tools, true)
+          }
+        )
+        this.run!.approval = approval
+        await approval.listen()
+        if (closed) {
+          approval.cancel()
+          return
+        }
+      }
       mkdirSync(workspace, { recursive: true })
       const mcp = join(this.runFolder, `${runId}.mcp.json`)
       const settings = join(this.runFolder, `${runId}.settings.json`)
@@ -527,13 +596,24 @@ export class ChatClient {
               command: node,
               args: [
                 gate,
+                ...(approval
+                  ? [
+                      '--approval-pipe',
+                      approval.pipe,
+                      '--approval-token',
+                      approval.token,
+                      '--approval-run',
+                      runId
+                    ]
+                  : []),
                 '--',
                 node,
                 server,
                 '--data',
-                this.snapshot.source,
+                source,
                 '--data-root',
-                app.getPath('appData')
+                app.getPath('appData'),
+                ...(writeEnabled ? ['--write'] : [])
               ]
             }
           }
@@ -579,10 +659,9 @@ export class ChatClient {
       const decoder = new StringDecoder('utf8')
       const errorDecoder = new StringDecoder('utf8')
       let buffer = ''
-      let initialized = false
       let partial = false
       let retryError = ''
-      let lastOutput = Date.now()
+      lastTick = Date.now()
       let waitingSince = Date.now()
       const text = (value: string): void => {
         if (!value) return
@@ -599,7 +678,7 @@ export class ChatClient {
           if (
             !Array.isArray(item.tools) ||
             item.tools.some(
-              (name: unknown) => typeof name !== 'string' || !readTools.includes(name)
+              (name: unknown) => typeof name !== 'string' || !allowedTools.includes(name)
             ) ||
             item.permissionMode !== 'default'
           ) {
@@ -607,8 +686,8 @@ export class ChatClient {
             return
           }
           if (
-            item.tools.length !== readTools.length ||
-            readTools.some((name) => !item.tools.includes(name))
+            item.tools.length !== allowedTools.length ||
+            allowedTools.some((name) => !item.tools.includes(name))
           ) {
             void finish('error', errors.missingTools, true)
             return
@@ -694,7 +773,8 @@ export class ChatClient {
       }
       task.child.stdout.on('data', (chunk) => {
         if (closed) return
-        lastOutput = Date.now()
+        silence = 0
+        lastTick = Date.now()
         buffer += decoder.write(chunk)
         let newline: number
         try {
@@ -709,13 +789,15 @@ export class ChatClient {
       })
       task.child.stderr.on('data', (chunk) => {
         if (closed) return
-        lastOutput = Date.now()
+        silence = 0
+        lastTick = Date.now()
         stderr = (stderr + errorDecoder.write(chunk)).split(/\r?\n/).slice(-21).join('\n')
       })
       task.child.on('error', (error) => {
         stderr += error.message
         void finish('error', errors.other)
       })
+      task.child.on('exit', () => approval?.cancel())
       task.child.on('close', () => {
         if (closed) return
         try {
@@ -735,8 +817,9 @@ export class ChatClient {
       })
       timer = setInterval(() => {
         if (closed) return
+        updateSilence()
         reply.elapsed = Math.floor((Date.now() - waitingSince) / 1000)
-        if (Date.now() - lastOutput >= 600000) void finish('error', errors.silent)
+        if (silence >= 600000) void finish('error', errors.silent)
         else this.publish()
       }, 1000)
     } catch (error) {

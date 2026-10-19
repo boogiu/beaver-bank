@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, CircleAlert, FlaskConical, ShieldAlert } from 'lucide-react'
+import { ChevronDown, CircleAlert, FlaskConical, ShieldAlert, PencilLine } from 'lucide-react'
 import type { ChatSnapshot, ChatSource } from '@shared/chat'
 import { Icon } from '../Ui'
 
@@ -97,11 +97,13 @@ export function ChatSelect({
 export function ChatConnection({
   chat,
   busy,
-  onSource
+  onSource,
+  onWrite
 }: {
   chat: ChatSnapshot
   busy: boolean
   onSource: (source: ChatSource) => void
+  onWrite: () => void
 }): React.JSX.Element {
   const status = chat.status
   const reason = {
@@ -157,25 +159,49 @@ export function ChatConnection({
           ]}
           onChange={(value) => onSource(value as ChatSource)}
         />
+        <label className="chat-write-switch-label">
+          기입 허용
+          <button
+            type="button"
+            role="switch"
+            className="chat-write-switch"
+            aria-label={`기입 허용: ${chat.writeEnabled ? '켜짐' : '꺼짐'}`}
+            aria-checked={chat.writeEnabled}
+            disabled={busy}
+            onClick={onWrite}
+          >
+            <span />
+          </button>
+        </label>
       </div>
-      {!chat.demo && chat.source === 'demo' && (
-        <p className="chat-demo-notice">
-          <Icon icon={FlaskConical} size={14} />
-          AI는 데모 데이터를 봅니다. 지금 화면의 데이터와 다릅니다.
-        </p>
-      )}
-      {chat.source === 'real' && (
-        <p className="chat-warning">
-          <Icon icon={ShieldAlert} size={14} />
-          실제 데이터가 AI 서비스로 전송됩니다.
-        </p>
-      )}
-      {status.state === 'ready' && !status.verified && (
-        <p className="chat-warning">
-          <Icon icon={CircleAlert} size={14} />
-          검증되지 않은 Claude Code 판({status.version || '알 수 없음'})입니다. 2.1.284 이상에서
-          확인했습니다.
-        </p>
+      {(!chat.demo || chat.writeEnabled || (status.state === 'ready' && !status.verified)) && (
+        <div className="chat-connection-notices">
+          {!chat.demo && chat.source === 'demo' && (
+            <p className="chat-demo-notice">
+              <Icon icon={FlaskConical} size={14} />
+              AI는 데모 데이터를 봅니다. 지금 화면의 데이터와 다릅니다.
+            </p>
+          )}
+          {chat.source === 'real' && (
+            <p className="chat-warning">
+              <Icon icon={ShieldAlert} size={14} />
+              실제 데이터가 AI 서비스로 전송됩니다.
+            </p>
+          )}
+          {chat.writeEnabled && (
+            <p className="chat-write-notice">
+              <Icon icon={PencilLine} size={14} />
+              기입은 하나씩 확인을 받습니다.
+            </p>
+          )}
+          {status.state === 'ready' && !status.verified && (
+            <p className="chat-warning">
+              <Icon icon={CircleAlert} size={14} />
+              검증되지 않은 Claude Code 판({status.version || '알 수 없음'})입니다. 2.1.284 이상에서
+              확인했습니다.
+            </p>
+          )}
+        </div>
       )}
     </section>
   )

@@ -23,8 +23,29 @@ export function ChatComposer({
   useLayoutEffect(() => {
     const element = input.current
     if (!element) return
-    element.style.height = '44px'
-    element.style.height = `${Math.max(44, Math.min(148, element.scrollHeight + 2))}px`
+    const panel = element.closest<HTMLElement>('.chat-panel')
+    const composer = element.closest<HTMLElement>('.chat-composer')
+    const header = panel?.querySelector<HTMLElement>('.chat-header')
+    const connection = panel?.querySelector<HTMLElement>('.chat-connection')
+    const hint = composer?.querySelector<HTMLElement>('.chat-input-hint')
+    const resize = (): void => {
+      // 안내가 여러 줄이어도 목록 160px과 고정 입력 영역을 먼저 확보한다.
+      // 입력은 최대 여섯 줄이며 작은 창의 남는 높이를 넘으면 안에서 스크롤한다.
+      const available =
+        panel && composer && header && connection
+          ? panel.clientHeight -
+            header.offsetHeight -
+            connection.offsetHeight -
+            160 -
+            (composer.offsetHeight - element.offsetHeight)
+          : 148
+      element.style.height = '44px'
+      element.style.height = `${Math.max(44, Math.min(148, Math.floor(available), element.scrollHeight + 2))}px`
+    }
+    resize()
+    const observer = new ResizeObserver(resize)
+    for (const target of [panel, header, connection, hint]) if (target) observer.observe(target)
+    return () => observer.disconnect()
   }, [draft])
   return (
     <div className="chat-composer">

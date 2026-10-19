@@ -1,18 +1,25 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { ArrowDown, CircleAlert, RotateCcw } from 'lucide-react'
-import type { ChatReply } from '@shared/chat'
+import type { ChatReply, ChatWriteCard as WriteCard } from '@shared/chat'
 import { Icon } from '../Ui'
 import { useReducedMotion, getReducedMotion } from '../../hooks/useReducedMotion'
 import { ChatRichText } from './ChatRichText'
 import { ChatToolRow } from './ChatToolRow'
+import { ChatWriteCard } from './ChatWriteCard'
 
 export function ChatTranscript({
   replies,
   onRetry,
+  onReceived,
+  onDecision,
+  open,
   children
 }: {
   replies: ChatReply[]
   onRetry: (id: string) => void
+  onReceived: (card: WriteCard) => void
+  onDecision: (card: WriteCard, decision: 'approve' | 'reject') => void
+  open: boolean
   children?: React.ReactNode
 }): React.JSX.Element {
   const viewport = useRef<HTMLDivElement>(null)
@@ -26,6 +33,15 @@ export function ChatTranscript({
     if (following.current && viewport.current)
       viewport.current.scrollTop = viewport.current.scrollHeight
   }, [replies])
+  useLayoutEffect(() => {
+    if (!open || !viewport.current) return
+    const first = viewport.current.querySelector<HTMLElement>('[data-state="pending"]')
+    if (first) {
+      viewport.current.scrollTop +=
+        first.getBoundingClientRect().top - viewport.current.getBoundingClientRect().top
+      following.current = false
+    }
+  }, [open])
   const lastDone = [...replies].reverse().find((reply) => reply.state !== 'running')
   return (
     <div className="chat-transcript-shell">
@@ -53,6 +69,13 @@ export function ChatTranscript({
               {reply.blocks.map((block, index) =>
                 block.kind === 'text' ? (
                   <ChatRichText key={index} text={block.text} />
+                ) : block.kind === 'write' ? (
+                  <ChatWriteCard
+                    key={block.cardId}
+                    card={block}
+                    onReceived={onReceived}
+                    onDecision={onDecision}
+                  />
                 ) : (
                   <ChatToolRow key={block.id} tool={block} />
                 )

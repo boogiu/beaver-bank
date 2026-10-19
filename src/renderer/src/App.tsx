@@ -160,8 +160,14 @@ function App(): React.JSX.Element {
           >
             <Icon icon={MessagesSquare} size={20} />
             AI 대화
-            {chat?.replies.some((reply) => reply.state === 'running') && (
-              <span className="chat-toggle-dot" />
+            {chat?.replies.some(
+              (reply) =>
+                reply.state === 'running' ||
+                reply.blocks.some((block) => block.kind === 'write' && block.state === 'pending')
+            ) && (
+              <span
+                className={`chat-toggle-dot ${chat.replies.some((reply) => reply.blocks.some((block) => block.kind === 'write' && block.state === 'pending')) ? 'has-pending' : ''}`}
+              />
             )}
           </button>
         </div>

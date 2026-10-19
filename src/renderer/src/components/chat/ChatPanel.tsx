@@ -19,7 +19,7 @@ export function ChatPanel({
 }): React.JSX.Element {
   const panel = useRef<HTMLElement>(null)
   const [draft, setDraft] = useState('')
-  const [dialog, setDialog] = useState<'new' | 'real' | null>(null)
+  const [dialog, setDialog] = useState<'new' | 'real' | 'write' | null>(null)
   const [nextSource, setNextSource] = useState<ChatSource | undefined>()
   const sending = useRef(false)
   const busy = chat.replies.some((reply) => reply.state === 'running')
@@ -36,6 +36,11 @@ export function ChatPanel({
     else void request({ kind: 'reset', source: value }).then(() => setDraft(''))
   }
   const confirm = async (): Promise<void> => {
+    if (dialog === 'write') {
+      await request({ kind: 'write-enabled', enabled: true, epoch: chat.epoch })
+      setDialog(null)
+      return
+    }
     if (dialog === 'new' && nextSource === 'real') {
       setDialog('real')
       return
@@ -81,9 +86,37 @@ export function ChatPanel({
         onNew={() => reset()}
         onClose={onClose}
       />
-      <ChatConnection chat={chat} busy={busy} onSource={reset} />
+      <ChatConnection
+        chat={chat}
+        busy={busy}
+        onSource={reset}
+        onWrite={() => {
+          if (busy) return
+          if (!chat.writeEnabled && chat.source === 'real') setDialog('write')
+          else
+            void request({ kind: 'write-enabled', enabled: !chat.writeEnabled, epoch: chat.epoch })
+        }}
+      />
       <ChatTranscript
         replies={chat.replies}
+        open={chat.settings.open}
+        onReceived={(card) => {
+          void request({
+            kind: 'card-received',
+            epoch: card.epoch,
+            runId: card.runId,
+            cardId: card.cardId
+          })
+        }}
+        onDecision={(card, decision) => {
+          void request({
+            kind: 'card-decision',
+            epoch: card.epoch,
+            runId: card.runId,
+            cardId: card.cardId,
+            decision
+          })
+        }}
         onRetry={(id) => {
           void request({ kind: 'retry', id, epoch: chat.epoch })
         }}
