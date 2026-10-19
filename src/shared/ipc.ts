@@ -1,3 +1,4 @@
+import type { ChatApi } from './chat'
 import type {
   AccountType,
   CardType,
@@ -228,7 +229,7 @@ export interface DashboardData {
   }
 }
 
-export interface Api {
+export interface Api extends ChatApi {
   getDataGeneration(): Promise<number>
   onDataChanged(listener: (generation: number) => void): () => void
   getDashboard(date?: string): Promise<Result<DashboardData>>

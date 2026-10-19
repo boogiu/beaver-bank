@@ -1,5 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { CreditCard, GitBranch, Info, Landmark, Tags, Repeat, LayoutDashboard } from 'lucide-react'
+import {
+  CreditCard,
+  GitBranch,
+  Info,
+  Landmark,
+  Tags,
+  Repeat,
+  LayoutDashboard,
+  MessagesSquare
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import mascot from './assets/illustrations/M1-C-mascot-a2.png'
 import { Icon } from './components/Ui'
@@ -13,6 +22,8 @@ import DashboardPage from './pages/DashboardPage'
 import { getReducedMotion } from './hooks/useReducedMotion'
 import { DamScene } from './components/DamScene'
 import { ExternalRefreshProvider } from './hooks/useExternalRefresh'
+import { useChat } from './hooks/useChat'
+import { ChatPanel } from './components/chat/ChatPanel'
 
 export type PageId = string
 export type NavigationTarget = {
@@ -43,6 +54,38 @@ const MENU: {
 ]
 
 function App(): React.JSX.Element {
+  const { chat, request } = useChat()
+  const chatToggle = useRef<HTMLButtonElement>(null)
+  const toggleChat = (): void => {
+    if (!chat) return
+    if (
+      chat.settings.open &&
+      document.getElementById('chat-panel')?.contains(document.activeElement)
+    )
+      chatToggle.current?.focus()
+    void request({ kind: 'settings', open: !chat.settings.open })
+  }
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent): void => {
+      if (
+        event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        event.key.toLowerCase() === 'l' &&
+        !document.querySelector('[role="dialog"]')
+      ) {
+        event.preventDefault()
+        if (
+          chat?.settings.open &&
+          document.getElementById('chat-panel')?.contains(document.activeElement)
+        )
+          chatToggle.current?.focus()
+        void request({ kind: 'settings', open: !chat?.settings.open })
+      }
+    }
+    document.addEventListener('keydown', keydown)
+    return () => document.removeEventListener('keydown', keydown)
+  }, [chat?.settings.open, request])
   const [page, setPage] = useState<PageId>('dashboard')
   const [target, setTarget] = useState<NavigationTarget | null>(null)
   const [hopping, setHopping] = useState(false)
@@ -90,20 +133,38 @@ function App(): React.JSX.Element {
           <span className="mascot-hit" onMouseEnter={hop} aria-hidden="true" />
           <span>BeaverBank</span>
         </div>
-        <nav className="menu-list" aria-label="주 메뉴" ref={menu}>
-          <div className="menu-highlight" ref={highlight} aria-hidden="true" />
-          {MENU.map(({ id, label, icon }) => (
-            <button
-              key={id}
-              className={`menu-button ${page === id ? 'active' : ''}`}
-              aria-current={page === id ? 'page' : undefined}
-              onClick={() => navigate(id)}
-            >
-              <Icon icon={icon} size={20} />
-              {label}
-            </button>
-          ))}
-        </nav>
+        <div className="menu-chat-group">
+          <nav className="menu-list" aria-label="주 메뉴" ref={menu}>
+            <div className="menu-highlight" ref={highlight} aria-hidden="true" />
+            {MENU.map(({ id, label, icon }) => (
+              <button
+                key={id}
+                className={`menu-button ${page === id ? 'active' : ''}`}
+                aria-current={page === id ? 'page' : undefined}
+                onClick={() => navigate(id)}
+              >
+                <Icon icon={icon} size={20} />
+                {label}
+              </button>
+            ))}
+          </nav>
+          <div className="chat-divider" />
+          <button
+            ref={chatToggle}
+            className={`menu-button chat-toggle ${chat?.settings.open ? 'is-open' : ''}`}
+            title={`AI 대화 ${chat?.settings.open ? '닫기' : '열기'} (Ctrl+L)`}
+            aria-expanded={chat?.settings.open ?? false}
+            aria-controls="chat-panel"
+            aria-keyshortcuts="Control+L"
+            onClick={toggleChat}
+          >
+            <Icon icon={MessagesSquare} size={20} />
+            AI 대화
+            {chat?.replies.some((reply) => reply.state === 'running') && (
+              <span className="chat-toggle-dot" />
+            )}
+          </button>
+        </div>
         <DamScene />
       </aside>
       <main
@@ -117,6 +178,7 @@ function App(): React.JSX.Element {
           <Current target={target} clearTarget={() => setTarget(null)} navigate={navigate} />
         </ExternalRefreshProvider>
       </main>
+      {chat && <ChatPanel chat={chat} request={request} onClose={toggleChat} />}
     </div>
   )
 }

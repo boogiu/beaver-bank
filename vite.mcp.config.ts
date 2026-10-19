@@ -24,7 +24,11 @@ export default defineConfig({
     target: 'node24',
     outDir: 'out/mcp',
     emptyOutDir: true,
-    lib: { entry: resolve('src/mcp/index.ts'), formats: ['cjs'], fileName: () => 'server.cjs' },
+    lib: {
+      entry: { server: resolve('src/mcp/index.ts'), 'chat-gate': resolve('src/mcp/chat-gate.ts') },
+      formats: ['cjs'],
+      fileName: (_format, entry) => `${entry}.cjs`
+    },
     rollupOptions: {
       external: (id) =>
         id.startsWith('node:') ||

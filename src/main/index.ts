@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, dialog, ipcMain, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -6,8 +6,11 @@ import { closeDatabase, getDbStatus, openDatabase } from './db'
 import * as service from './db/service'
 import { configureDemo, resetDemoDatabase, seedDemo } from './demo'
 import { watchExternalChanges } from './external-changes'
+import { registerChat } from './chat-client'
 
 let externalChanges: ReturnType<typeof watchExternalChanges> | undefined
+let chat: ReturnType<typeof registerChat> | undefined
+let quitting = false
 
 const demo = process.argv.includes('--demo')
 if (demo) configureDemo()
@@ -25,11 +28,25 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      spellcheck: false, // Google 사전 다운로드로 생기는 외부 요청을 막는다.
       sandbox: false
     }
   })
 
   externalChanges?.attach(mainWindow)
+  let loaded = false
+  mainWindow.webContents.on('did-finish-load', () => {
+    loaded = true
+  })
+  mainWindow.webContents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => {
+    if (isMainFrame && loaded) void chat?.dispose()
+  })
+  mainWindow.webContents.on('render-process-gone', () => {
+    void chat?.dispose()
+  })
+  mainWindow.webContents.on('destroyed', () => {
+    void chat?.dispose()
+  })
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
@@ -139,6 +156,9 @@ function registerIpc(): void {
 }
 
 app.whenReady().then(() => {
+  // 로컬 화면을 위해 외부 맞춤법 사전을 내려받지 않는다.
+  session.defaultSession.setSpellCheckerEnabled(false) // 한국어 사전의 Google 요청·UDP를 막는다.
+  session.defaultSession.setSpellCheckerLanguages([])
   electronApp.setAppUserModelId('com.boogiu.beaverbank')
 
   // 개발 중 F12로 DevTools 열기, 배포본에서는 새로고침 단축키 무시
@@ -160,6 +180,7 @@ app.whenReady().then(() => {
   }
 
   registerIpc()
+  chat = registerChat()
   externalChanges = watchExternalChanges()
   createWindow()
 
@@ -172,6 +193,14 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', (event) => {
+  if (quitting) return
+  event.preventDefault()
+  quitting = true
+  void chat?.dispose().finally(() => app.quit())
+  if (!chat) app.quit()
 })
 
 app.on('will-quit', () => {

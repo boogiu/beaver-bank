@@ -4,6 +4,16 @@ import type { Api } from '../shared/ipc'
 
 // renderer에서 window.api로 쓰는 main 프로세스 기능
 const api: Api = {
+  getChat: () => ipcRenderer.invoke('chat:get'),
+  requestChat: (request) => ipcRenderer.invoke('chat:request', request),
+  onChat: (listener) => {
+    const receive = (
+      _event: Electron.IpcRendererEvent,
+      snapshot: import('../shared/chat').ChatSnapshot
+    ): void => listener(snapshot)
+    ipcRenderer.on('chat:changed', receive)
+    return () => ipcRenderer.removeListener('chat:changed', receive)
+  },
   getDataGeneration: () => ipcRenderer.invoke('data:generation'),
   onDataChanged: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, generation: number): void =>

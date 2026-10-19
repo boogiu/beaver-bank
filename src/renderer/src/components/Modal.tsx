@@ -6,6 +6,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Button, Icon } from './Ui'
 import { getReducedMotion } from '../hooks/useReducedMotion'
 import { useExternalModal } from '../hooks/useExternalRefresh'
+import { createPortal } from 'react-dom'
 
 // 호출부는 닫는 즉시 기능과 상태를 끝낸다. 남기는 복제는 입력·역할 없는 모습뿐이다.
 function leaveAppearance(backdrop: HTMLElement): void {
@@ -40,7 +41,8 @@ export function Modal({
   onSubmit,
   submitLabel = '저장',
   error,
-  small = false
+  small = false,
+  focusedButtonsOnly = false
 }: {
   title: string
   children: ReactNode
@@ -49,6 +51,7 @@ export function Modal({
   submitLabel?: string
   error?: ApiError | null
   small?: boolean
+  focusedButtonsOnly?: boolean
 }): React.JSX.Element {
   useExternalModal()
   const [fieldError, setFieldError] = useState(false)
@@ -73,7 +76,9 @@ export function Modal({
     const backdrop = modal.current?.parentElement
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const first = modal.current?.querySelector<HTMLElement>(
-      'input, textarea, .custom-select-button, button:not(.close-button)'
+      focusedButtonsOnly
+        ? '.modal-foot button'
+        : 'input, textarea, .custom-select-button, button:not(.close-button)'
     )
     first?.focus()
     return () => {
@@ -81,7 +86,7 @@ export function Modal({
       if (backdrop) leaveAppearance(backdrop)
       if (previous?.isConnected) previous.focus()
     }
-  }, [])
+  }, [focusedButtonsOnly])
   useLayoutEffect(() => {
     const field = error?.field
       ? [...(modal.current?.querySelectorAll<HTMLElement>('[data-field]') ?? [])].find(
@@ -104,6 +109,10 @@ export function Modal({
         close()
       }
       if (event.key === 'Enter' && !(event.target instanceof HTMLTextAreaElement)) {
+        if (focusedButtonsOnly) {
+          if (!(event.target instanceof HTMLButtonElement)) event.preventDefault()
+          return
+        }
         event.preventDefault()
         if (event.target instanceof Element && event.target.closest('[data-enter-inert]')) return
         submit()
@@ -129,8 +138,8 @@ export function Modal({
     }
     document.addEventListener('keydown', onKeyDown, true)
     return () => document.removeEventListener('keydown', onKeyDown, true)
-  }, [close, submit])
-  return (
+  }, [close, submit, focusedButtonsOnly])
+  return createPortal(
     <div className="modal-backdrop" onMouseDown={(event) => event.stopPropagation()}>
       <div
         ref={modal}
@@ -156,7 +165,8 @@ export function Modal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
