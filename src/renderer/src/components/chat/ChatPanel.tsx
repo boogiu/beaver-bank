@@ -7,21 +7,38 @@ import { ChatTranscript } from './ChatTranscript'
 import { ChatComposer } from './ChatComposer'
 import { ChatEmpty } from './ChatEmpty'
 import { ChatNotices } from './ChatNotices'
+import { useReducedMotion } from '../../hooks/useReducedMotion'
 
 export function ChatPanel({
   chat,
   request,
-  onClose
+  onClose,
+  docked
 }: {
   chat: ChatSnapshot
   request: (request: ChatRequest) => Promise<void>
   onClose: () => void
+  docked: boolean
 }): React.JSX.Element {
   const panel = useRef<HTMLElement>(null)
   const [draft, setDraft] = useState('')
   const [dialog, setDialog] = useState<'new' | 'real' | 'write' | null>(null)
   const [nextSource, setNextSource] = useState<ChatSource | undefined>()
   const sending = useRef(false)
+  const wasOpen = useRef(false)
+  const reduced = useReducedMotion()
+  useEffect(() => {
+    // Mode changes keep the same panel and never replay its opening animation.
+    const element = panel.current
+    if (chat.settings.open && !wasOpen.current && docked && !reduced)
+      element?.classList.add('dock-opening')
+    wasOpen.current = chat.settings.open
+    const timer = window.setTimeout(() => element?.classList.remove('dock-opening'), 150)
+    return () => {
+      window.clearTimeout(timer)
+      element?.classList.remove('dock-opening')
+    }
+  }, [chat.settings.open, docked, reduced])
   const busy = chat.replies.some((reply) => reply.state === 'running')
   useEffect(() => {
     if (chat.settings.open)
@@ -62,7 +79,7 @@ export function ChatPanel({
     <aside
       ref={panel}
       id="chat-panel"
-      className={`chat-panel ${chat.settings.open ? 'is-open' : ''} ${chat.source}`}
+      className={`chat-panel ${chat.settings.open ? 'is-open' : ''} ${docked ? 'is-docked' : ''} ${chat.source}`}
       aria-label="AI 대화"
       aria-hidden={!chat.settings.open}
       inert={!chat.settings.open}

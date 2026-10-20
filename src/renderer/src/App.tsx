@@ -55,6 +55,29 @@ const MENU: {
 
 function App(): React.JSX.Element {
   const { chat, request } = useChat()
+  // outerWidth includes the native frame; CSS media queries use the inner viewport.
+  const [windowWidth, setWindowWidth] = useState(() => window.outerWidth)
+  useLayoutEffect(() => {
+    let frame = 0
+    const measure = (): void => setWindowWidth(window.outerWidth)
+    const resized = (): void => {
+      measure()
+      // The native frame size can reach the renderer just after its resize event.
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        measure()
+        frame = window.requestAnimationFrame(measure)
+      })
+    }
+    window.addEventListener('resize', resized)
+    measure()
+    return () => {
+      window.removeEventListener('resize', resized)
+      window.cancelAnimationFrame(frame)
+    }
+  }, [])
+  const docked = windowWidth >= 1280
+  const panelWidth = docked ? Math.min(400, Math.max(320, windowWidth - 960)) : 320
   const chatToggle = useRef<HTMLButtonElement>(null)
   const toggleChat = (): void => {
     if (!chat) return
@@ -121,7 +144,10 @@ function App(): React.JSX.Element {
   const Current = MENU.find((item) => item.id === page)!.component
 
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell ${chat?.settings.open && docked ? 'chat-docked' : ''}`}
+      style={{ '--chat-panel-width': `${panelWidth}px` } as React.CSSProperties}
+    >
       <aside className="sidebar">
         <div className="brand">
           <img
@@ -173,18 +199,20 @@ function App(): React.JSX.Element {
         </div>
         <DamScene />
       </aside>
-      <main
-        key={page}
-        className={`page ${page === 'graph' ? 'graph-page' : ''}`}
-        onPointerDown={() => {
-          if (target) setTarget(null)
-        }}
-      >
-        <ExternalRefreshProvider key={page}>
-          <Current target={target} clearTarget={() => setTarget(null)} navigate={navigate} />
-        </ExternalRefreshProvider>
-      </main>
-      {chat && <ChatPanel chat={chat} request={request} onClose={toggleChat} />}
+      <div className="page-viewport">
+        <main
+          key={page}
+          className={`page ${page === 'graph' ? 'graph-page' : ''}`}
+          onPointerDown={() => {
+            if (target) setTarget(null)
+          }}
+        >
+          <ExternalRefreshProvider key={page}>
+            <Current target={target} clearTarget={() => setTarget(null)} navigate={navigate} />
+          </ExternalRefreshProvider>
+        </main>
+      </div>
+      {chat && <ChatPanel chat={chat} request={request} onClose={toggleChat} docked={docked} />}
     </div>
   )
 }

@@ -1,4 +1,21 @@
 @import 'tailwindcss';
+/* Reuse each layout declaration for closed/overlay viewport flags and docked size queries. */
+@custom-variant page-compact {
+  @container page-lane style(--compact-layout: true) {
+    @slot;
+  }
+  @container page-lane (max-width: 854px) {
+    @slot;
+  }
+}
+@custom-variant page-wide {
+  @container page-lane style(--wide-layout: true) {
+    @slot;
+  }
+  @container page-lane (min-width: 1254px) {
+    @slot;
+  }
+}
 @font-face {
   font-family: Pretendard;
   src: url('./fonts/Pretendard-Regular.ttf') format('truetype');
@@ -195,6 +212,32 @@ select:focus-visible,
   height: 100%;
   min-height: 0;
   overflow: hidden;
+}
+.page-viewport {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  container-name: page-lane;
+  --docked-layout: false;
+  --compact-layout: false;
+  --wide-layout: false;
+}
+.chat-docked > .page-viewport {
+  container-type: inline-size;
+  --docked-layout: true;
+}
+/* Closed/overlay pages retain the original viewport breakpoints. The shared
+   rules below query these flags, or the actual lane width when docked. */
+@media (max-width: 1050px) {
+  .app-shell:not(.chat-docked) > .page-viewport {
+    --compact-layout: true;
+  }
+}
+@media (min-width: 1450px) {
+  .app-shell:not(.chat-docked) > .page-viewport {
+    --wide-layout: true;
+  }
 }
 .sidebar {
   position: relative;
@@ -895,7 +938,7 @@ select:focus-visible,
     left: 150%;
   }
 }
-@media (max-width: 1050px) {
+@variant page-compact {
   .payment-card-grid {
     grid-template-columns: repeat(auto-fill, 280px);
   }
@@ -1576,7 +1619,7 @@ select:focus-visible,
 .account-total strong {
   margin-right: auto;
 }
-@media (max-width: 1050px) {
+@variant page-compact {
   .month-totals {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1779,9 +1822,6 @@ select:focus-visible,
   border-bottom: 5px solid transparent;
 }
 @media (max-width: 1050px) {
-  .page {
-    padding: 20px;
-  }
   .sidebar {
     flex-basis: 176px;
   }
@@ -1799,6 +1839,11 @@ select:focus-visible,
     left: 4px;
     width: 34px;
     height: 34px;
+  }
+}
+@variant page-compact {
+  .page {
+    padding: 20px;
   }
   .card-grid {
     grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
@@ -2083,7 +2128,7 @@ select:focus-visible,
 .dashboard-more {
   margin: 0 0 16px;
 }
-@media (min-width: 1450px) {
+@variant page-wide {
   .dashboard-panels {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2322,7 +2367,33 @@ select:focus-visible,
     transform 0.3s ease-out,
     opacity 0.3s ease-out;
 }
-.chat-panel :is(button, textarea):focus-visible {
+.chat-panel.is-docked {
+  width: var(--chat-panel-width);
+  transform: none;
+  transition: none;
+  box-shadow: none;
+}
+.chat-panel.is-docked.is-open {
+  position: relative;
+  flex: 0 0 var(--chat-panel-width);
+}
+.chat-panel.dock-opening > :not([role='dialog']) {
+  animation: chat-dock-in 0.15s ease-out;
+}
+@keyframes chat-dock-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* A closed panel runs no endless motion: its layers would change how the pages are drawn. */
+.chat-panel:not(.is-open)
+  :is(.chat-empty > img, .chat-tool-running, .chat-cursor, .chat-thinking > span) {
+  animation: none;
+}
+.chat-panel :is(button, textarea, summary):focus-visible {
   outline: 1px solid #4fb6c9;
   outline-offset: 2px;
 }
@@ -2333,6 +2404,21 @@ select:focus-visible,
 .chat-panel button:disabled {
   cursor: default;
   color: #a3a3a3;
+  opacity: 1;
+}
+.chat-panel .chat-data > button:disabled {
+  color: #a3a3a3;
+  border-color: #a3a3a3;
+}
+.chat-panel .chat-write-switch:disabled {
+  background: #262626;
+  border-color: #a3a3a3;
+}
+.chat-panel .chat-write-switch:disabled > span {
+  background: #a3a3a3;
+}
+.chat-panel .chat-write-actions > button:disabled {
+  background: #262626;
 }
 .chat-header {
   height: 52px;

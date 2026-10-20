@@ -235,6 +235,8 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
 
   const [reduced] = useState(getReducedMotion)
   const firstLayout = useRef(true)
+  // Until the user zooms, pans or drags, a resize lays out and fits the graph again.
+  const autoFit = useRef(true)
   const preserveLayout = useRef(false)
   const detached = useRef(new Set<string>())
   const [loaded, setLoaded] = useState(false)
@@ -280,7 +282,9 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
     const measure = (width: number, height: number): void =>
       setSize((old) => (old.width === width && old.height === height ? old : { width, height }))
     measure(element.clientWidth, element.clientHeight)
-    const observer = new ResizeObserver(() => measure(element.clientWidth, element.clientHeight))
+    const observer = new ResizeObserver(() => {
+      if (autoFit.current) measure(element.clientWidth, element.clientHeight)
+    })
     observer.observe(element)
     return () => observer.disconnect()
   }, [purposes, accounts, cards, flows, showInactive])
@@ -473,7 +477,10 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
     queueMicrotask(() => {
       if (cancelled) return
       started = performance.now()
-      if (!preserve) fit(nodes)
+      if (!preserve) {
+        autoFit.current = true
+        fit(nodes)
+      }
       draw()
       if (unfold)
         timer = window.setTimeout(() => {
@@ -554,6 +561,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     drag.current = { id: node.id, startX: event.clientX, startY: event.clientY, moved: false }
+    autoFit.current = false
     const target = model.current.find((n) => n.id === node.id)!
     detached.current.add(node.id)
     target.fx = target.x = node.x
@@ -606,7 +614,20 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
           </div>
           <div className="page-actions">
             <Switch label="해지 항목 보기" checked={showInactive} onChange={setShowInactive} />
-            <Button icon={Scan} onClick={() => fit(model.current)}>
+            <Button
+              icon={Scan}
+              onClick={() => {
+                autoFit.current = true
+                const element = region.current
+                // A resize skipped to keep the user's view is laid out now, as on any resize.
+                if (
+                  element &&
+                  (element.clientWidth !== size.width || element.clientHeight !== size.height)
+                )
+                  setSize({ width: element.clientWidth, height: element.clientHeight })
+                else fit(model.current)
+              }}
+            >
               화면에 맞추기
             </Button>
           </div>
@@ -635,6 +656,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                   0.3,
                   Math.min(3, view.scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15))
                 )
+                autoFit.current = false
                 setView({
                   scale,
                   x: x - ((x - view.x) * scale) / view.scale,
@@ -655,12 +677,13 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                   const current = pan.current
                   const x = event.clientX
                   const y = event.clientY
-                  if (current)
-                    setView((old) => ({
-                      ...old,
-                      x: current.tx + x - current.x,
-                      y: current.ty + y - current.y
-                    }))
+                  if (!current) return
+                  if (x !== current.x || y !== current.y) autoFit.current = false
+                  setView((old) => ({
+                    ...old,
+                    x: current.tx + x - current.x,
+                    y: current.ty + y - current.y
+                  }))
                 }}
                 onPointerUp={(event) => {
                   pan.current = null
