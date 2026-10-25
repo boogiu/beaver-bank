@@ -98,14 +98,18 @@ export function ChatConnection({
   chat,
   busy,
   onSource,
-  onWrite
+  onWrite,
+  onTools
 }: {
   chat: ChatSnapshot
   busy: boolean
   onSource: (source: ChatSource) => void
   onWrite: () => void
+  onTools: () => void
 }): React.JSX.Element {
   const status = chat.status
+  // 01에서는 명령 복사 경우에만 판 안내 뒤에 "업데이트"가 있고 AI 도구 팝업을 연다(CS-24).
+  const update = chat.setup.claude?.task === 'claude-update' && chat.setup.claude.mode === 'copy'
   const reason = {
     missing: '없음',
     login: '로그인 필요',
@@ -197,8 +201,15 @@ export function ChatConnection({
           {status.state === 'ready' && !status.verified && (
             <p className="chat-warning">
               <Icon icon={CircleAlert} size={14} />
-              검증되지 않은 Claude Code 판({status.version || '알 수 없음'})입니다. 2.1.284 이상에서
-              확인했습니다.
+              <span>
+                검증되지 않은 Claude Code 판({status.version || '알 수 없음'})입니다. 2.1.284
+                이상에서 확인했습니다.
+                {update && (
+                  <button type="button" className="chat-update-link" onClick={onTools}>
+                    업데이트
+                  </button>
+                )}
+              </span>
             </p>
           )}
         </div>

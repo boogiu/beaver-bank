@@ -40,6 +40,29 @@ export interface ChatReply {
   retry?: string
   waiting: boolean
 }
+export const chatSetupTasks = [
+  'claude-install',
+  'claude-login',
+  'claude-update',
+  'codex-install',
+  'codex-login'
+] as const
+export type ChatSetupTask = (typeof chatSetupTasks)[number]
+// 지금 상태에 맞는 작업 하나의 판정. blocked: 이유 문장만, copy: 명령 복사, window: 작업 창
+export interface ChatSetupAction {
+  task: ChatSetupTask
+  mode: 'blocked' | 'copy' | 'window'
+  reason?: string
+  notice?: string
+  command?: string
+  source?: string
+  dimmed?: boolean
+}
+export interface ChatSetup {
+  claude?: ChatSetupAction
+  codex?: ChatSetupAction
+  copy?: { task: ChatSetupTask; ok: boolean; sequence: number }
+}
 export interface ChatSnapshot {
   revision: number
   epoch: string
@@ -48,6 +71,8 @@ export interface ChatSnapshot {
   writeEnabled: boolean
   demo: boolean
   status: ChatStatus
+  codex: ChatStatus
+  setup: ChatSetup
   replies: ChatReply[]
 }
 export type ChatRequest =
@@ -62,6 +87,8 @@ export type ChatRequest =
     }
   | { kind: 'settings'; open?: boolean; model?: ChatModel }
   | { kind: 'check' }
+  | { kind: 'tools-check' }
+  | { kind: 'copy'; task: ChatSetupTask }
   | { kind: 'send'; text: string; epoch: string }
   | { kind: 'retry'; id: string; epoch: string }
   | { kind: 'stop' }

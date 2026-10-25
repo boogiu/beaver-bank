@@ -3,7 +3,7 @@ import type { ChatRequest, ChatSnapshot } from '@shared/chat'
 
 export function useChat(): {
   chat: ChatSnapshot | null
-  request: (request: ChatRequest) => Promise<void>
+  request: (request: ChatRequest) => Promise<ChatSnapshot>
 } {
   const [chat, setChat] = useState<ChatSnapshot | null>(null)
   const active = useRef(true)
@@ -30,10 +30,11 @@ export function useChat(): {
       unsubscribe()
     }
   }, [])
-  const request = async (value: ChatRequest): Promise<void> => {
+  const request = async (value: ChatRequest): Promise<ChatSnapshot> => {
     const snapshot = await window.api.requestChat(value)
     if (active.current)
       setChat((current) => (!current || snapshot.revision >= current.revision ? snapshot : current))
+    return snapshot
   }
   return { chat, request }
 }

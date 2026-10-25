@@ -1,4 +1,10 @@
-import type { ChatSource, ChatStatus } from '@shared/chat'
+import type {
+  ChatRequest,
+  ChatSetupAction,
+  ChatSnapshot,
+  ChatSource,
+  ChatStatus
+} from '@shared/chat'
 import mascot from '../../assets/illustrations/M1-C-mascot-a2.png'
 import { ChatNotices } from './ChatNotices'
 import { usageNotice } from './ChatDialogs'
@@ -6,11 +12,17 @@ import { usageNotice } from './ChatDialogs'
 export function ChatEmpty({
   status,
   source,
+  action,
+  sequence,
+  request,
   onSuggestion,
   onCheck
 }: {
   status: ChatStatus
   source: ChatSource
+  action?: ChatSetupAction
+  sequence: number
+  request: (request: ChatRequest) => Promise<ChatSnapshot>
   onSuggestion: (text: string) => void
   onCheck: () => void
 }): React.JSX.Element {
@@ -30,7 +42,13 @@ export function ChatEmpty({
           )}
         </div>
       ) : (
-        <ChatNotices status={status} onCheck={onCheck} />
+        <ChatNotices
+          status={status}
+          action={action}
+          sequence={sequence}
+          request={request}
+          onCheck={onCheck}
+        />
       )}
       <div className="chat-privacy">
         <p>{usageNotice}</p>

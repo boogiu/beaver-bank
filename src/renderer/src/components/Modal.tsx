@@ -42,16 +42,22 @@ export function Modal({
   submitLabel = '저장',
   error,
   small = false,
-  focusedButtonsOnly = false
+  focusedButtonsOnly = false,
+  footer,
+  initialFocus
 }: {
   title: string
   children: ReactNode
   onClose: () => void
-  onSubmit: () => void | Promise<void>
+  onSubmit?: () => void | Promise<void>
   submitLabel?: string
   error?: ApiError | null
   small?: boolean
   focusedButtonsOnly?: boolean
+  // 바닥 단추를 바꿔 넣는다. data-modal-close가 있는 단추는 기본 닫기와 같다.
+  footer?: ReactNode
+  // 처음 포커스 대상(팝업 안의 선택자). 없으면 지금 규칙대로다.
+  initialFocus?: string
 }): React.JSX.Element {
   useExternalModal()
   const [fieldError, setFieldError] = useState(false)
@@ -65,7 +71,7 @@ export function Modal({
     onClose()
   }, [onClose])
   const submit = useCallback((): void => {
-    if (!active.current || submitting.current) return
+    if (!active.current || submitting.current || !onSubmit) return
     submitting.current = true
     void Promise.resolve(onSubmit()).finally(() => {
       submitting.current = false
@@ -76,9 +82,10 @@ export function Modal({
     const backdrop = modal.current?.parentElement
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const first = modal.current?.querySelector<HTMLElement>(
-      focusedButtonsOnly
-        ? '.modal-foot button'
-        : 'input, textarea, .custom-select-button, button:not(.close-button)'
+      initialFocus ??
+        (focusedButtonsOnly
+          ? '.modal-foot button'
+          : 'input, textarea, .custom-select-button, button:not(.close-button)')
     )
     first?.focus()
     return () => {
@@ -86,7 +93,7 @@ export function Modal({
       if (backdrop) leaveAppearance(backdrop)
       if (previous?.isConnected) previous.focus()
     }
-  }, [focusedButtonsOnly])
+  }, [focusedButtonsOnly, initialFocus])
   useLayoutEffect(() => {
     const field = error?.field
       ? [...(modal.current?.querySelectorAll<HTMLElement>('[data-field]') ?? [])].find(
@@ -158,11 +165,22 @@ export function Modal({
           {children}
           {error && !fieldError && <p className="error-banner">{error.message}</p>}
         </div>
-        <div className="modal-foot">
-          <Button onClick={close}>취소</Button>
-          <Button variant="primary" onClick={submit}>
-            {submitLabel}
-          </Button>
+        <div
+          className="modal-foot"
+          onClick={(event) => {
+            if (footer && (event.target as Element).closest('[data-modal-close]')) close()
+          }}
+        >
+          {footer ? (
+            footer
+          ) : (
+            <>
+              <Button onClick={close}>취소</Button>
+              <Button variant="primary" onClick={submit}>
+                {submitLabel}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>,

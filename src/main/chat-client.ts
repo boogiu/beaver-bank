@@ -1,23 +1,25 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, clipboard, ipcMain } from 'electron'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync
-} from 'node:fs'
-import { isAbsolute, join, delimiter, dirname, resolve } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { StringDecoder } from 'node:string_decoder'
 import { constants, setPriority } from 'node:os'
-import { chatModels, type ChatSnapshot, type ChatRequest, type ChatReply } from '../shared/chat'
+import {
+  chatModels,
+  chatSetupTasks,
+  type ChatSnapshot,
+  type ChatRequest,
+  type ChatReply,
+  type ChatSetupTask,
+  type ChatStatus
+} from '../shared/chat'
 import { readChatSettings, writeChatSettings } from './chat-settings'
 import { checkChatData, readChatNames } from './chat-data'
 import { writeToolNames } from '../shared/chat-gate'
 import { ChatApproval } from './chat-approval'
+import { findClient, findNode, type ChatClientName, type Executable } from './chat-find'
+import { integrity, judge, readFacts, taskFor } from './chat-setup'
 
 const instructions = [
   'BeaverBank는 용도별 계좌와 정기 흐름으로 돈을 관리하는 앱이고, 건별 지출 가계부가 아니다.',
@@ -64,62 +66,8 @@ function errorMessage(value: string): string {
   return errors.other
 }
 
-interface Executable {
-  command: string
-  prefix: string[]
-}
 const system = (name: string): string =>
   join(process.env.SystemRoot || 'C:\\Windows', 'System32', name)
-function file(path: string): boolean {
-  try {
-    return statSync(path).isFile()
-  } catch {
-    return false
-  }
-}
-function findNode(): string | null {
-  for (const directory of (process.env.PATH || '').split(delimiter)) {
-    const candidate = resolve(directory.replace(/^"|"$/g, ''), 'node.exe')
-    if (file(candidate)) return candidate
-  }
-  return null
-}
-function executable(path: string): Executable | null {
-  if (!file(path)) return null
-  if (/\.(exe|com)$/i.test(path)) return { command: path, prefix: [] }
-  if (!/\.(cmd|bat)$/i.test(path)) return null
-  // 단일 Node 호출만 해석한다. 조건문·변수 확장·여러 명령이 있는 shim은 실행하지 않는다.
-  let shim: string
-  try {
-    shim = readFileSync(path, 'utf8')
-  } catch {
-    return null
-  }
-  const lines = shim
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !/^@?echo off$/i.test(line))
-  if (lines.length !== 1) return null
-  const match = lines[0].match(
-    /^@?(?:"node(?:\.exe)?"|node(?:\.exe)?|"%(?:~dp0|dp0%)[\\/]node\.exe")\s+"%(?:~dp0|dp0%)[\\/]([^"\r\n]+\.(?:js|cjs|mjs))"\s+%\*\s*$/i
-  )
-  if (!match || match[1].includes('%') || /[&|<>^]/.test(match[1])) return null
-  const script = resolve(dirname(path), match[1])
-  const node = file(join(dirname(path), 'node.exe')) ? join(dirname(path), 'node.exe') : findNode()
-  return node && file(script) ? { command: node, prefix: [script] } : null
-}
-function findClaude(): Executable | null {
-  const override = process.env.BEAVERBANK_CLAUDE_PATH
-  if (override !== undefined) return isAbsolute(override) ? executable(override) : null
-  const extensions = (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD').split(';')
-  for (const directory of (process.env.PATH || '').split(delimiter)) {
-    for (const extension of extensions) {
-      const result = executable(resolve(directory.replace(/^"|"$/g, ''), 'claude' + extension))
-      if (result) return result
-    }
-  }
-  return executable(join(process.env.USERPROFILE || '', '.local', 'bin', 'claude.exe'))
-}
 
 interface Managed {
   child: ChildProcessWithoutNullStreams
@@ -251,12 +199,21 @@ export class ChatClient {
     writeEnabled: false,
     demo: process.argv.includes('--demo'),
     status: { state: 'unknown' },
+    codex: { state: 'unknown' },
+    setup: {},
     replies: []
   }
   private checking?: Promise<void>
+  private codexChecking?: Promise<void>
   private checks = new Set<Managed>()
   private checked = false
   private lifecycle = 0
+  private found: Partial<Record<ChatClientName, Executable | null>> = {}
+  // 권한 수준은 성공한 결과만 앱이 도는 동안 기억한다. 실패는 다음 확인에서 다시 시도한다.
+  private admin?: 'yes' | 'no'
+  private adminCheck?: Promise<void>
+  private adminTried = false
+  private copies = 0
   private session?: string
   private loginCheck?: Promise<void>
   private run?: {
@@ -273,14 +230,76 @@ export class ChatClient {
         rmSync(join(this.runFolder, name), { force: true })
   }
   private publish(): void {
+    this.refreshSetup()
     this.snapshot.revision++
     for (const window of BrowserWindow.getAllWindows())
       if (!window.webContents.isDestroyed()) window.webContents.send('chat:changed', this.snapshot)
   }
+  // 상태에 맞는 작업마다 선행 조건과 명령 복사를 다시 판정한다. 작업이 없으면 파일을 보지 않는다.
+  private refreshSetup(): void {
+    const tasks = {
+      claude: taskFor('claude', this.snapshot.status),
+      codex: taskFor('codex', this.snapshot.codex)
+    }
+    // 권한 확인이 아직 없거나 진행 중이면 판정을 미룬다(작업 표시 없음).
+    const admin = this.admin ?? (this.adminCheck || !this.adminTried ? 'pending' : 'unknown')
+    const facts =
+      tasks.claude || tasks.codex
+        ? readFacts(join(app.getPath('userData'), 'chat', 'setup'), admin)
+        : undefined
+    this.snapshot.setup = {
+      claude: tasks.claude && facts && judge(tasks.claude, facts, this.found.claude),
+      codex: tasks.codex && facts && judge(tasks.codex, facts, this.found.codex),
+      copy: this.snapshot.setup.copy
+    }
+  }
+  // 관리자 판정(CS-39): whoami의 무결성 SID. 결과가 필요해질 때 처음 한 번 실행한다.
+  private ensureAdmin(): Promise<void> {
+    if (this.admin) return Promise.resolve()
+    if (this.adminCheck) return this.adminCheck
+    const lifecycle = this.lifecycle
+    this.adminTried = true
+    this.adminCheck = this.statusCommand(
+      { command: system('whoami.exe'), prefix: [] },
+      ['/groups', '/fo', 'csv', '/nh'],
+      Date.now() + 5000
+    )
+      .then(({ code, text }) => {
+        const level = code === 0 ? integrity(text) : 'unknown'
+        if (lifecycle === this.lifecycle && level !== 'unknown') this.admin = level
+      })
+      .finally(() => {
+        this.adminCheck = undefined
+      })
+    return this.adminCheck
+  }
+  private async prepareSetup(
+    lifecycle: number,
+    claude: ChatStatus,
+    codex: ChatStatus
+  ): Promise<void> {
+    if (lifecycle !== this.lifecycle || this.admin) return
+    if (taskFor('claude', claude) || taskFor('codex', codex)) await this.ensureAdmin()
+  }
+  // 명령 복사(CS-83): main이 판정을 다시 하고 글자를 만들어 클립보드에 쓰기만 한다.
+  private async copy(task: ChatSetupTask): Promise<void> {
+    this.refreshSetup()
+    const action = this.snapshot.setup[task.startsWith('claude') ? 'claude' : 'codex']
+    if (action?.task !== task || action.mode !== 'copy' || action.dimmed || !action.command) return
+    let ok = false
+    try {
+      await clipboard.writeText(action.command)
+      ok = (await clipboard.readText()) === action.command
+    } catch {
+      ok = false
+    }
+    this.snapshot.setup.copy = { task, ok, sequence: ++this.copies }
+  }
   private async statusCommand(
     exe: Executable,
     args: string[],
-    deadline: number
+    deadline: number,
+    read = true
   ): Promise<{ code: number | null; text: string }> {
     const task = managed(exe.command, [...exe.prefix, ...args])
     this.checks.add(task)
@@ -295,8 +314,9 @@ export class ChatClient {
           },
           Math.max(1, deadline - Date.now())
         )
+        // read가 거짓이면 출력을 비우기만 하고 읽거나 남기지 않는다(Codex login status, CS-16).
         task.child.stdout.on('data', (chunk) => {
-          text += decoder.write(chunk)
+          if (read) text += decoder.write(chunk)
         })
         task.child.on('error', () => {
           clearTimeout(timer)
@@ -304,7 +324,7 @@ export class ChatClient {
         })
         task.child.on('close', (code) => {
           clearTimeout(timer)
-          resolve({ code, text: text + decoder.end() })
+          resolve({ code, text: read ? text + decoder.end() : '' })
         })
       })
     } finally {
@@ -318,58 +338,98 @@ export class ChatClient {
     const lifecycle = this.lifecycle
     this.snapshot.status = { state: 'checking' }
     this.publish()
+    // 결과는 권한 확인까지 마친 뒤 한 번에 싣는다. 진행 중 확인에 [다시 확인]이 묻히지 않게 한다.
     this.checking = (async () => {
-      const exe = findClaude()
-      if (!exe) {
-        this.snapshot.status = { state: 'missing' }
-        return
-      }
-      const deadline = Date.now() + 10000
-      let timeout = false
-      const timer = setTimeout(() => {
-        timeout = true
-        this.snapshot.status = { state: 'unknown' }
-        this.publish()
-      }, 10000)
-      try {
-        const versionResult = await this.statusCommand(exe, ['-v'], deadline)
-        if (lifecycle !== this.lifecycle) return
-        if (versionResult.code !== 0 || Date.now() >= deadline) {
-          this.snapshot.status = { state: 'unknown' }
-          return
-        }
-        const version = versionResult.text.match(/\b(\d+\.\d+\.\d+)\b/)?.[1]
-        const auth = await this.statusCommand(exe, ['auth', 'status'], deadline)
-        if (lifecycle !== this.lifecycle) return
-        if (timeout || auth.code === null) {
-          this.snapshot.status = { state: 'unknown' }
-          return
-        }
-        let loggedIn: boolean | undefined
-        try {
-          const value = JSON.parse(auth.text).loggedIn
-          if (typeof value === 'boolean') loggedIn = value
-        } catch {
-          /* JSON 없는 상태는 확인 불가 */
-        }
-        const parts = version?.split('.').map(Number)
-        const verified =
-          !!parts &&
-          (parts[0] > 2 ||
-            (parts[0] === 2 && (parts[1] > 1 || (parts[1] === 1 && parts[2] >= 284))))
-        this.snapshot.status = {
-          state: loggedIn && auth.code === 0 ? 'ready' : loggedIn === false ? 'login' : 'unknown',
-          version,
-          verified
-        }
-      } finally {
-        clearTimeout(timer)
-      }
+      const status = await this.readClaude(lifecycle)
+      if (!status) return
+      await this.prepareSetup(lifecycle, status, this.snapshot.codex)
+      if (lifecycle === this.lifecycle) this.snapshot.status = status
     })().finally(() => {
       this.checking = undefined
       this.publish()
     })
     return this.checking
+  }
+  private async readClaude(lifecycle: number): Promise<ChatStatus | undefined> {
+    const exe = findClient('claude')
+    this.found.claude = exe
+    if (!exe) return { state: 'missing' }
+    const deadline = Date.now() + 10000
+    let timeout = false
+    const timer = setTimeout(() => {
+      timeout = true
+      this.snapshot.status = { state: 'unknown' }
+      this.publish()
+    }, 10000)
+    try {
+      const versionResult = await this.statusCommand(exe, ['-v'], deadline)
+      if (lifecycle !== this.lifecycle) return undefined
+      if (versionResult.code !== 0 || Date.now() >= deadline) return { state: 'unknown' }
+      const version = versionResult.text.match(/\b(\d+\.\d+\.\d+)\b/)?.[1]
+      const auth = await this.statusCommand(exe, ['auth', 'status'], deadline)
+      if (lifecycle !== this.lifecycle) return undefined
+      if (timeout || auth.code === null) return { state: 'unknown' }
+      let loggedIn: boolean | undefined
+      try {
+        const value = JSON.parse(auth.text).loggedIn
+        if (typeof value === 'boolean') loggedIn = value
+      } catch {
+        /* JSON 없는 상태는 확인 불가 */
+      }
+      const parts = version?.split('.').map(Number)
+      const verified =
+        !!parts &&
+        (parts[0] > 2 || (parts[0] === 2 && (parts[1] > 1 || (parts[1] === 1 && parts[2] >= 284))))
+      return {
+        state: loggedIn && auth.code === 0 ? 'ready' : loggedIn === false ? 'login' : 'unknown',
+        version,
+        verified
+      }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  // Codex 상태 확인(CS-16): AI 도구 팝업을 열 때와 그 [다시 확인]에서만 부른다.
+  async checkCodex(): Promise<void> {
+    if (this.codexChecking) return this.codexChecking
+    const lifecycle = this.lifecycle
+    this.snapshot.codex = { state: 'checking' }
+    this.publish()
+    this.codexChecking = (async () => {
+      const status = await this.readCodex(lifecycle)
+      if (!status) return
+      await this.prepareSetup(lifecycle, this.snapshot.status, status)
+      if (lifecycle === this.lifecycle) this.snapshot.codex = status
+    })().finally(() => {
+      this.codexChecking = undefined
+      this.publish()
+    })
+    return this.codexChecking
+  }
+  private async readCodex(lifecycle: number): Promise<ChatStatus | undefined> {
+    const exe = findClient('codex')
+    this.found.codex = exe
+    if (!exe) return { state: 'missing' }
+    const deadline = Date.now() + 10000
+    let timeout = false
+    const timer = setTimeout(() => {
+      timeout = true
+      this.snapshot.codex = { state: 'unknown' }
+      this.publish()
+    }, 10000)
+    try {
+      const versionResult = await this.statusCommand(exe, ['--version'], deadline)
+      if (lifecycle !== this.lifecycle) return undefined
+      const version = versionResult.text.match(/(?<![\d.])(\d+\.\d+\.\d+)(?![\d.])/)?.[1]
+      if (timeout || versionResult.code !== 0 || !version) return { state: 'unknown' }
+      const login = await this.statusCommand(exe, ['login', 'status'], deadline, false)
+      if (lifecycle !== this.lifecycle) return undefined
+      return timeout || login.code === null
+        ? { state: 'unknown' }
+        : { state: login.code === 0 ? 'ready' : 'login', version }
+    } finally {
+      clearTimeout(timer)
+    }
   }
   async request(request: ChatRequest): Promise<ChatSnapshot> {
     if (!request || typeof request !== 'object' || typeof request.kind !== 'string')
@@ -405,6 +465,22 @@ export class ChatClient {
       if (this.snapshot.settings.open && !this.checked) void this.check()
     }
     if (request.kind === 'check' && !this.run) void this.check()
+    // AI 도구 팝업 열기와 그 [다시 확인]. 답을 받는 동안 Claude는 마지막 상태를 둔다(CS-21).
+    if (request.kind === 'tools-check') {
+      // 두 클라이언트의 "확인 중"을 먼저 한 번에 싣고 나서 실행한다. 실행 시작이 늦어도 한쪽만 바뀌어 보이지 않는다.
+      if (!this.codexChecking) this.snapshot.codex = { state: 'checking' }
+      if (!this.run && !this.checking) this.snapshot.status = { state: 'checking' }
+      this.publish()
+      void this.checkCodex()
+      if (!this.run) void this.check()
+      void this.ensureAdmin().then(() => this.publish())
+    }
+    if (
+      request.kind === 'copy' &&
+      Object.keys(request).every((key) => key === 'kind' || key === 'task') &&
+      chatSetupTasks.includes(request.task)
+    )
+      await this.copy(request.task)
     if (
       request.kind === 'send' &&
       request.epoch === this.snapshot.epoch &&
@@ -462,7 +538,8 @@ export class ChatClient {
   private confirmLoginFailure(lifecycle: number): Promise<void> {
     if (lifecycle !== this.lifecycle) return Promise.resolve()
     if (this.loginCheck) return this.loginCheck
-    const exe = findClaude()
+    const exe = findClient('claude')
+    this.found.claude = exe
     if (!exe) {
       this.snapshot.status = { state: 'missing' }
       this.publish()
@@ -470,9 +547,10 @@ export class ChatClient {
     }
     // 실제 응답의 인증 실패를 상태 명령의 캐시된 로그인 결과로 덮지 않는다.
     this.loginCheck = this.statusCommand(exe, ['auth', 'status'], Date.now() + 10000)
-      .then(() => {})
+      .then(() => this.prepareSetup(lifecycle, this.snapshot.status, this.snapshot.codex))
       .finally(() => {
         this.loginCheck = undefined
+        this.publish()
       })
     return this.loginCheck
   }
@@ -529,7 +607,7 @@ export class ChatClient {
     this.run = { id: runId, finish }
     this.publish()
     try {
-      const exe = findClaude()
+      const exe = findClient('claude')
       if (!exe) {
         this.snapshot.status = { state: 'missing' }
         await finish('error', 'Claude Code를 찾지 못했습니다.')
@@ -831,9 +909,11 @@ export class ChatClient {
     this.lifecycle++
     this.snapshot.epoch = randomUUID()
     if (this.snapshot.status.state === 'checking') this.snapshot.status = { state: 'unknown' }
+    if (this.snapshot.codex.state === 'checking') this.snapshot.codex = { state: 'unknown' }
     await this.run?.finish('stopped')
     await Promise.all([...this.checks].map((task) => task.close()))
     await this.loginCheck
+    await this.adminCheck
   }
 }
 

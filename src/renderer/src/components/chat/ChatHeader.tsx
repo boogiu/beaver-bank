@@ -1,4 +1,4 @@
-import { PanelRightClose, SquarePen } from 'lucide-react'
+import { PanelRightClose, SquarePen, Wrench } from 'lucide-react'
 import type { ChatModel } from '@shared/chat'
 import { Icon } from '../Ui'
 import { ChatSelect } from './ChatConnection'
@@ -7,12 +7,14 @@ export function ChatHeader({
   model,
   busy,
   onModel,
+  onTools,
   onNew,
   onClose
 }: {
   model: ChatModel
   busy: boolean
   onModel: (model: ChatModel) => void
+  onTools: () => void
   onNew: () => void
   onClose: () => void
 }): React.JSX.Element {
@@ -30,6 +32,14 @@ export function ChatHeader({
         }))}
         onChange={(value) => onModel(value as ChatModel)}
       />
+      <button
+        className="chat-icon chat-tools-button"
+        aria-label="AI 도구"
+        title="AI 도구 — 설치·로그인"
+        onClick={onTools}
+      >
+        <Icon icon={Wrench} size={16} />
+      </button>
       <button className="chat-icon" aria-label="새 대화" title="새 대화" onClick={onNew}>
         <Icon icon={SquarePen} size={16} />
       </button>

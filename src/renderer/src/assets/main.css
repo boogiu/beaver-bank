@@ -2813,7 +2813,8 @@ select:focus-visible,
   margin-top: 3px;
 }
 .chat-error > button,
-.chat-recheck {
+.chat-recheck,
+.chat-copy {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3173,3 +3174,167 @@ select:focus-visible,
   background: #e0a93b;
 }
 .chat-connection-notices { display:flex; flex-direction:column; }
+/* AI 도구 팝업(CS-21·22)과 명령 복사(CS-81·83). 팝업은 body portal이라 .chat-panel 규칙이 닿지 않는다. */
+.chat-tools-intro {
+  margin: 0;
+  color: #a3a3a3;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.chat-tools-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.chat-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #363636;
+  border-radius: 8px;
+  background: #1e1e1e;
+}
+.chat-tool-main {
+  flex: 1;
+  min-width: 0;
+}
+.chat-tool-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+}
+.chat-tool-title strong {
+  color: #dadada;
+  font-size: 14px;
+  font-weight: 600;
+}
+.chat-tool-title span {
+  color: #a3a3a3;
+  font-size: 12px;
+}
+.chat-tool-status {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+  color: #a3a3a3;
+  font-size: 12px;
+}
+.chat-tool-status .is-ready {
+  color: #dadada;
+}
+.chat-tool-reason {
+  margin: 6px 0 0;
+  color: #a3a3a3;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-tools-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 12px 0 0;
+  color: #a3a3a3;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-tools-note > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.chat-command {
+  margin-top: 6px;
+}
+/* 안내 상자 안에서는 기존 .chat-notice p(여백·색)보다 앞서야 한다. */
+.chat-command-notice,
+.chat-notice .chat-command-notice {
+  margin: 0 0 6px;
+  color: #a3a3a3;
+  font-size: 12px;
+  line-height: 1.5;
+}
+/* 안내 상자 안에서는 대화의 .chat-panel pre(가로 스크롤)보다 앞서야 한다. */
+.chat-code,
+.chat-panel .chat-code {
+  overflow: visible;
+  max-width: none;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #363636;
+  border-radius: 6px;
+  background: #1e1e1e;
+  color: #dadada;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.chat-command-source,
+.chat-notice .chat-command-source {
+  margin: 6px 0 0;
+  color: #a3a3a3;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.chat-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.chat-notice-actions > button {
+  margin-top: 0;
+}
+/* [명령 복사]는 [다시 확인]과 같은 기본 단추다(위 .chat-recheck 규칙을 함께 쓴다). */
+.chat-copy {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.chat-copy.is-copied,
+.chat-copy.is-copied > svg {
+  color: #4fb6c9;
+}
+.chat-copy[aria-disabled='true'] {
+  background: #262626;
+  color: #a3a3a3;
+  cursor: default;
+}
+.chat-tool-row .chat-copy {
+  height: 32px;
+  margin-top: 0;
+}
+.chat-copy-failed,
+.chat-notice .chat-copy-failed {
+  margin: 6px 0 0;
+  color: #e0a93b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-update-link,
+.chat-panel .chat-update-link {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #e0a93b;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.chat-tools-recheck[aria-disabled='true'],
+.chat-tools-recheck[aria-disabled='true']:hover {
+  border-color: var(--border);
+  background: var(--surface);
+  cursor: default;
+  opacity: 0.5;
+}
+.chat-tools-recheck[aria-disabled='true']:active {
+  scale: none;
+}
