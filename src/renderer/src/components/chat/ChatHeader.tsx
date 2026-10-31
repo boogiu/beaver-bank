@@ -6,6 +6,7 @@ import { ChatSelect } from './ChatConnection'
 export function ChatHeader({
   model,
   busy,
+  working,
   onModel,
   onTools,
   onNew,
@@ -13,6 +14,7 @@ export function ChatHeader({
 }: {
   model: ChatModel
   busy: boolean
+  working: boolean
   onModel: (model: ChatModel) => void
   onTools: () => void
   onNew: () => void
@@ -35,10 +37,12 @@ export function ChatHeader({
       <button
         className="chat-icon chat-tools-button"
         aria-label="AI 도구"
+        aria-description={working ? '설치·로그인 창이 열려 있음' : undefined}
         title="AI 도구 — 설치·로그인"
         onClick={onTools}
       >
         <Icon icon={Wrench} size={16} />
+        {working && <span className="chat-tools-dot" />}
       </button>
       <button className="chat-icon" aria-label="새 대화" title="새 대화" onClick={onNew}>
         <Icon icon={SquarePen} size={16} />

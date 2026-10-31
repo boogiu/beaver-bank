@@ -44,7 +44,8 @@ export function Modal({
   small = false,
   focusedButtonsOnly = false,
   footer,
-  initialFocus
+  initialFocus,
+  returnFocus
 }: {
   title: string
   children: ReactNode
@@ -58,6 +59,8 @@ export function Modal({
   footer?: ReactNode
   // 처음 포커스 대상(팝업 안의 선택자). 없으면 지금 규칙대로다.
   initialFocus?: string
+  // 닫을 때 처음 포커스가 있던 요소가 문서에 없으면 포커스를 둘 곳(선택자). 없으면 지금 규칙대로다.
+  returnFocus?: string
 }): React.JSX.Element {
   useExternalModal()
   const [fieldError, setFieldError] = useState(false)
@@ -92,8 +95,9 @@ export function Modal({
       active.current = false
       if (backdrop) leaveAppearance(backdrop)
       if (previous?.isConnected) previous.focus()
+      else if (returnFocus) document.querySelector<HTMLElement>(returnFocus)?.focus()
     }
-  }, [focusedButtonsOnly, initialFocus])
+  }, [focusedButtonsOnly, initialFocus, returnFocus])
   useLayoutEffect(() => {
     const field = error?.field
       ? [...(modal.current?.querySelectorAll<HTMLElement>('[data-field]') ?? [])].find(

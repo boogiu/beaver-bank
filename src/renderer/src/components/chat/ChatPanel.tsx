@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ChatRequest, ChatSnapshot, ChatSource } from '@shared/chat'
+import type { ChatRequest, ChatSetupTask, ChatSnapshot, ChatSource } from '@shared/chat'
 import { ChatHeader } from './ChatHeader'
 import { ChatConnection } from './ChatConnection'
 import { ChatDialog } from './ChatDialogs'
@@ -8,6 +8,7 @@ import { ChatComposer } from './ChatComposer'
 import { ChatEmpty } from './ChatEmpty'
 import { ChatNotices } from './ChatNotices'
 import { ChatTools } from './ChatTools'
+import { ChatSetupConfirm } from './ChatSetupConfirm'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 
 export function ChatPanel({
@@ -26,6 +27,12 @@ export function ChatPanel({
   const [dialog, setDialog] = useState<'new' | 'real' | 'write' | null>(null)
   // AI 도구 팝업. waiting은 팝업이 보낸 확인 요청의 답을 기다리는 동안이다.
   const [tools, setTools] = useState<{ waiting: boolean } | null>(null)
+  // 실행 확인 팝업(CS-25). from은 연 곳: 안내 상자, AI 도구 팝업, 연결 영역의 "업데이트"
+  const [setup, setSetup] = useState<{
+    task: ChatSetupTask
+    from: 'notice' | 'tools' | 'link'
+  } | null>(null)
+  const approvedFocus = useRef(false)
   const [nextSource, setNextSource] = useState<ChatSource | undefined>()
   const sending = useRef(false)
   const wasOpen = useRef(false)
@@ -43,6 +50,8 @@ export function ChatPanel({
     }
   }, [chat.settings.open, docked, reduced])
   const busy = chat.replies.some((reply) => reply.state === 'running')
+  // Claude 작업 창이 열려 있으면 Claude는 "작업 중"이고 보낼 수 없다(CS-49).
+  const claudeRunning = chat.setup.running?.client === 'claude' ? chat.setup.running : undefined
   // 포커스는 사용자 조작으로만 옮긴다(CH-151 패널 열기). 상태 확인이 끝난 것만으로는 옮기지 않는다.
   // 이어지는 두 경우만 그 조작의 끝으로 본다: 패널을 열 때 확인 중이라 미룬 이동(그사이 포커스가 그대로일 때),
   // 패널 안에서 누른 요소가 막히거나 사라져 포커스가 빠진 경우(예: [다시 확인] 뒤 입력창이 열림).
@@ -97,6 +106,33 @@ export function ChatPanel({
       setTools((current) => current && { waiting: false })
     )
   }
+  // 작업 단추 → 실행 확인 팝업. main이 판정을 다시 하고 창 명령 줄을 준비해 snapshot에 싣는다(프로세스 없음).
+  const openConfirm = (task: ChatSetupTask, from: 'notice' | 'tools' | 'link'): void => {
+    if (from === 'tools') setTools(null)
+    setSetup({ task, from })
+    void request({ kind: 'setup-prepare', task })
+  }
+  const cancelConfirm = (): void => {
+    void request({ kind: 'setup-cancel' })
+    // AI 도구 팝업에서 열었으면 그 팝업으로 돌아간다. 새로 확인하지 않고 마지막 상태로 그린다.
+    if (setup?.from === 'tools') setTools({ waiting: false })
+    setSetup(null)
+  }
+  const approveConfirm = (token: string): void => {
+    if (!setup) return
+    void request({ kind: 'setup-start', task: setup.task, token })
+    approvedFocus.current = true
+    setSetup(null)
+  }
+  // 승인 뒤 포커스: 안내 상자의 [다시 확인], 없으면 "AI 도구"(CS-25). 팝업이 처음 기억한 단추로 돌아가지 않게 닫힌 뒤 옮긴다.
+  useEffect(() => {
+    if (setup || !approvedFocus.current) return
+    approvedFocus.current = false
+    const target =
+      panel.current?.querySelector<HTMLElement>('.chat-notice .chat-recheck:not(:disabled)') ??
+      panel.current?.querySelector<HTMLElement>('.chat-tools-button')
+    target?.focus()
+  }, [setup])
   const reset = (value?: ChatSource): void => {
     if (value === chat.source) return
     if (!value && chat.replies.length === 0) return
@@ -120,7 +156,8 @@ export function ChatPanel({
     setDialog(null)
   }
   const send = (): void => {
-    if (sending.current || busy || chat.status.state !== 'ready' || !draft.trim()) return
+    if (sending.current || busy || claudeRunning || chat.status.state !== 'ready' || !draft.trim())
+      return
     sending.current = true
     const text = draft
     setDraft('')
@@ -153,6 +190,7 @@ export function ChatPanel({
       <ChatHeader
         model={chat.settings.model}
         busy={busy}
+        working={!!chat.setup.running}
         onModel={(model) => {
           void request({ kind: 'settings', model })
         }}
@@ -171,6 +209,7 @@ export function ChatPanel({
             void request({ kind: 'write-enabled', enabled: !chat.writeEnabled, epoch: chat.epoch })
         }}
         onTools={checkTools}
+        onUpdate={() => openConfirm('claude-update', 'link')}
       />
       <ChatTranscript
         replies={chat.replies}
@@ -201,6 +240,9 @@ export function ChatPanel({
             status={chat.status}
             source={chat.source}
             action={chat.setup.claude}
+            running={claudeRunning}
+            result={chat.setup.results?.claude}
+            onTask={(task) => openConfirm(task, 'notice')}
             sequence={chat.setup.copy?.sequence ?? 0}
             request={request}
             onCheck={() => {
@@ -215,6 +257,9 @@ export function ChatPanel({
           <ChatNotices
             status={chat.status}
             action={chat.setup.claude}
+            running={claudeRunning}
+            result={chat.setup.results?.claude}
+            onTask={(task) => openConfirm(task, 'notice')}
             sequence={chat.setup.copy?.sequence ?? 0}
             request={request}
             onCheck={() => {
@@ -227,7 +272,7 @@ export function ChatPanel({
         draft={draft}
         onDraft={setDraft}
         busy={busy}
-        disabled={chat.status.state !== 'ready'}
+        disabled={chat.status.state !== 'ready' || !!claudeRunning}
         onSend={send}
         onStop={() => {
           void request({ kind: 'stop' })
@@ -240,6 +285,18 @@ export function ChatPanel({
           onCheck={checkTools}
           request={request}
           onClose={() => setTools(null)}
+          onTask={(task) => openConfirm(task, 'tools')}
+        />
+      )}
+      {setup && (
+        <ChatSetupConfirm
+          key={setup.task}
+          task={setup.task}
+          action={chat.setup[setup.task.startsWith('claude') ? 'claude' : 'codex']}
+          pending={chat.setup.pending}
+          version={chat.status.version}
+          onCancel={cancelConfirm}
+          onApprove={approveConfirm}
         />
       )}
       {dialog && (

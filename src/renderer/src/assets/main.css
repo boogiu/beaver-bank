@@ -3338,3 +3338,168 @@ select:focus-visible,
 .chat-tools-recheck[aria-disabled='true']:active {
   scale: none;
 }
+/* 설치·로그인 도우미 02: 주 단추(CS-27), 작업 중(CS-18·22·23·24), 결과 줄(CS-29), 실행 확인 팝업(CS-25),
+   "AI 도구"의 점(CS-20), 움직임(CS-63). 팝업은 body portal이라 .chat-panel 범위 밖에도 둔다. */
+.chat-primary,
+.chat-panel .chat-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 28px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid #946043;
+  border-radius: 4px;
+  background: #835539;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chat-primary:hover,
+.chat-panel .chat-primary:hover {
+  background: #946043;
+}
+.chat-primary[aria-disabled='true'],
+.chat-primary[aria-disabled='true']:hover,
+.chat-panel .chat-primary[aria-disabled='true'] {
+  border-color: #363636;
+  background: #262626;
+  color: #a3a3a3;
+  cursor: default;
+}
+.chat-tool-row .chat-primary {
+  height: 32px;
+}
+.chat-confirm-approve[aria-disabled='true'],
+.chat-confirm-approve[aria-disabled='true']:hover {
+  border-color: #363636;
+  background: #262626;
+  color: #a3a3a3;
+  cursor: default;
+}
+.chat-confirm-approve[aria-disabled='true']:active {
+  scale: none;
+}
+.chat-status-dot.working {
+  background: none;
+  border: 1px solid #4fb6c9;
+}
+.chat-working,
+.chat-clients .chat-working,
+.chat-tool-status .chat-working {
+  color: #4fb6c9;
+}
+.chat-spinner {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: #4fb6c9;
+  animation: chat-spin 1s linear infinite;
+}
+.chat-notice .chat-spinner {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+.chat-tool-status .chat-spinner {
+  margin-right: 5px;
+}
+.chat-result,
+.chat-notice .chat-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-tool-live .chat-result {
+  margin: 6px 0 0;
+}
+.chat-result > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.chat-result.is-ok,
+.chat-notice .chat-result.is-ok {
+  color: #4fb6c9;
+}
+.chat-result.is-failed,
+.chat-notice .chat-result.is-failed {
+  color: #e0a93b;
+}
+.chat-override-warning,
+.chat-notice .chat-override-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: #e0a93b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-override-warning > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.chat-tools-button {
+  position: relative;
+}
+/* 단추 바깥 테두리에서 위 5px·오른쪽 5px(1px 테두리 안쪽 기준 4px) */
+.chat-tools-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4fb6c9;
+  animation: chat-pulse 1.6s infinite;
+}
+.chat-panel:not(.is-open) :is(.chat-spinner, .chat-tools-dot) {
+  animation: none;
+}
+.chat-confirm-intro {
+  margin: 0;
+  color: #dadada;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.chat-confirm-label {
+  margin: 12px 0 4px;
+  color: #a3a3a3;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-confirm-display {
+  max-height: 200px;
+  overflow-y: auto;
+}
+.chat-confirm-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  color: #a3a3a3;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-confirm-facts li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.chat-confirm-facts li > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-spinner,
+  .chat-tools-dot {
+    animation: none !important;
+  }
+}

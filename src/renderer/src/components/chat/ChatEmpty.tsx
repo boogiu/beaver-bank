@@ -1,6 +1,9 @@
 import type {
   ChatRequest,
   ChatSetupAction,
+  ChatSetupResult,
+  ChatSetupRunning,
+  ChatSetupTask,
   ChatSnapshot,
   ChatSource,
   ChatStatus
@@ -13,25 +16,31 @@ export function ChatEmpty({
   status,
   source,
   action,
+  running,
+  result,
   sequence,
   request,
   onSuggestion,
-  onCheck
+  onCheck,
+  onTask
 }: {
   status: ChatStatus
   source: ChatSource
   action?: ChatSetupAction
+  running?: ChatSetupRunning
+  result?: ChatSetupResult
   sequence: number
   request: (request: ChatRequest) => Promise<ChatSnapshot>
   onSuggestion: (text: string) => void
   onCheck: () => void
+  onTask: (task: ChatSetupTask) => void
 }): React.JSX.Element {
   return (
     <div className="chat-empty">
       <img src={mascot} alt="" />
       <h3>무엇이 궁금하세요?</h3>
       <p>BeaverBank의 계좌·카드·정기 흐름을 보고 답합니다.</p>
-      {status.state === 'ready' ? (
+      {status.state === 'ready' && !running ? (
         <div className="chat-suggestions">
           {['계좌별 잔액 알려 줘', '이번 달 정기 결제 보여 줘', '다음 주에 나갈 돈은?'].map(
             (text) => (
@@ -45,9 +54,12 @@ export function ChatEmpty({
         <ChatNotices
           status={status}
           action={action}
+          running={running}
+          result={result}
           sequence={sequence}
           request={request}
           onCheck={onCheck}
+          onTask={onTask}
         />
       )}
       <div className="chat-privacy">

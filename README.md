@@ -12,7 +12,7 @@ BeaverBank는 여러 계좌(적금, 용도별 통장)와 매달 반복되는 돈
 - **잔액 자동 계산**: `현재 잔액 = 마지막 보정 잔액 + 이후 실행된 정기 흐름의 합`
 - **대시보드**: 총자산과 용도별 비중, 이번 달 나갈 돈, 적금 진행률과 만기, 잔액 변화 추이
 - **AI 연동 (MCP)**: 데모부터 연결하는 로컬 stdio 서버, 읽기 8개·선택적 쓰기 16개 도구와 화면 자동 반영
-- **AI 채팅창**: 오른쪽에서 Claude Code로 대화하고, 기입마다 확인 카드로 결정 (Codex 준비 중)
+- **AI 채팅창**: 오른쪽에서 Claude Code로 대화하고, 기입마다 확인 카드로 결정. Claude Code·Codex 설치·로그인 도우미(확인 팝업 → Windows Terminal 창) 포함 (Codex 대화는 준비 중)
 - **바탕화면 위젯**: 반투명 위젯으로 핵심 숫자 표시
 
 ## 기술 스택
@@ -120,6 +120,8 @@ npm run demo
 데모는 `%APPDATA%\BeaverBank-demo\beaverbank-dev.sqlite`를 사용합니다. **데모 앱을 다시 실행할 때마다 데모가 초기화됩니다.** 서버의 쓰기 결과를 확인할 때는 열려 있는 앱을 유지하세요. 기존 데모를 보존해야 한다면 아래 임시 데모 절차를 사용하세요.
 
 등록 후 `get_status`에서 `source=demo`, `write=false`, `memos=false`, `database.state=ready`인지 확인합니다. 읽기 도구 8개가 보여야 합니다. `BeaverBank 계좌를 보여 줘`, `이번 달 정기 결제와 월말 잔액을 보여 줘`, `어느 데이터에 연결돼 있고 쓰기가 켜져 있어?`라고 물어볼 수 있습니다. 처음 데모의 활성 계좌는 9개입니다.
+
+Claude Code나 Codex가 없으면 앱의 AI 채팅창 머리에 있는 **AI 도구**에서 설치·로그인할 수 있습니다([AI 도구 설치와 로그인](#ai-도구-설치와-로그인)).
 
 #### Claude Code
 
@@ -304,10 +306,50 @@ codex mcp add beaverbank-demo -- node "C:\path\to\BeaverBank\out\mcp\server.cjs"
 
 ### 준비
 
-1. Claude Code를 직접 설치하고, 터미널에서 `claude`를 실행해 로그인합니다. **2.1.284 이상**에서 확인했습니다.
+1. Claude Code를 설치하고 로그인합니다. 채팅창의 **[설치]·[로그인]**으로 하거나([AI 도구 설치와 로그인](#ai-도구-설치와-로그인)), 공식 문서대로 직접 할 수 있습니다. **2.1.284 이상**에서 확인했습니다.
 2. Node 22 이상을 설치하고 저장소에서 `npm install`, `npm run build`를 실행합니다.
 
-앱은 설치·로그인·업데이트를 대신하지 않습니다. `claude`는 PATH에서 먼저 찾고, 없으면 `%USERPROFILE%\.local\bin\claude.exe`를 씁니다. 공식 설치판 `claude.exe`를 권장합니다. `.cmd`·`.bat`는 `@echo off`와 고정된 Node 호출 한 줄로 된 파일만 지원합니다.
+앱은 사용자가 단추를 누르고 확인 팝업에서 승인한 공식 명령만, 사용자에게 보이는 Windows Terminal 창에서 실행합니다. 그 밖의 때에는 설치·로그인·업데이트를 하지 않습니다. `claude`는 PATH에서 먼저 찾고, 없으면 `%USERPROFILE%\.local\bin\claude.exe`를 씁니다. 공식 설치판 `claude.exe`를 권장합니다. `.cmd`는 `@echo off`와 고정된 Node 호출 한 줄로 된 파일과 npm이 만드는 표준 `.cmd`를 지원하고, `.bat`는 한 줄 꼴만 지원합니다.
+
+### AI 도구 설치와 로그인
+
+Claude Code가 없거나 로그인되어 있지 않으면 채팅창의 안내 상자에 **[설치]**·**[로그인]**이 보입니다. 패널 머리의 **AI 도구**(렌치 아이콘)를 누르면 Claude Code와 Codex의 상태·판과 작업 단추가 한 팝업에 보이고, Claude Code 판이 2.1.284보다 낮으면 **[업데이트]**도 보입니다.
+
+모든 실행은 **단추 → 확인 팝업 → 보이는 Windows Terminal 창** 차례입니다. 확인 팝업은 실행할 공식 명령, 출처, BeaverBank가 여는 창의 명령 줄 전체를 그대로 보여 주고, 승인했을 때만 창을 엽니다. 앱을 켜거나 상태가 바뀌는 것만으로는 아무것도 실행하지 않으며, 설치가 끝나도 로그인 창을 저절로 잇지 않습니다.
+
+실행하는 공식 명령(2026-10-20 확인):
+
+- Claude Code 설치 — Claude Code 공식 문서 "Advanced setup"(https://code.claude.com/docs/en/setup)
+
+  ```powershell
+  irm https://claude.ai/install.ps1 | iex
+  ```
+
+- Codex 설치 — Codex 공식 문서 "Codex CLI"(https://learn.chatgpt.com/docs/codex/cli)
+
+  ```powershell
+  powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"
+  ```
+
+- Claude Code 로그인: `claude auth login` — Claude Code 공식 문서 "CLI reference"(https://code.claude.com/docs/en/cli-reference)
+- Claude Code 업데이트: `claude update` — Claude Code 공식 문서 "Advanced setup"(https://code.claude.com/docs/en/setup)
+- Codex 로그인: `codex login` — Codex 공식 문서 "Authentication"(https://learn.chatgpt.com/docs/auth)
+
+로그인과 업데이트는 `claude`·`codex` 자리에 앱이 찾은 실행 파일의 절대 경로를 넣어 실행합니다(예: `%USERPROFILE%\.local\bin\claude.exe`를 펼친 경로로 `auth login`).
+
+**Windows Terminal이 필요합니다.** Microsoft Store의 Windows Terminal이나 공식 GitHub 릴리스(자동 업데이트 없음)로 설치합니다(https://learn.microsoft.com/en-us/windows/terminal/install). Windows Terminal이 없거나 창을 열 수 없으면 작업 단추 대신 **[명령 복사]**가 보입니다. 복사한 명령을 PowerShell 창에 붙여 넣어 직접 실행한 뒤 [다시 확인]을 누르세요. 앱은 복사한 명령을 실행하지 않습니다.
+
+작업 창은 Windows Terminal의 새 창이나 이미 열린 창의 새 탭으로 열리고, 제목은 "BeaverBank · Claude Code 설치"처럼 보입니다. BeaverBank를 꺼도 이 창은 닫히지 않습니다. 끝나면 창에서 Enter를 눌러 닫으세요. 창이 닫히면 앱이 상태를 다시 확인하고 결과를 한 줄로 보여 줍니다. 창이 열려 있는 동안에는 다른 설치·로그인을 시작할 수 없고, Claude Code 작업 중에는 채팅창에서 보낼 수 없습니다.
+
+- **설치 위치**: Claude Code는 `%USERPROFILE%\.local\bin\claude.exe`, Codex는 `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin\codex.exe`입니다. 둘 다 관리자 권한이 필요 없고, 앱도 관리자 권한을 요청하지 않습니다.
+- **PATH**: Codex 설치 명령은 사용자 PATH에 설치 폴더를 더합니다. Claude Code 설치 명령은 PATH를 바꾸지 않습니다. 앱은 PATH에 없어도 위 설치 위치에서 찾습니다. 터미널에서 `claude`를 바로 쓰려면 공식 문서의 PATH 안내를 따르세요.
+- **로그인 정보**: 앱은 로그인 정보를 읽거나 저장하지 않고, 작업 창의 내용을 읽지 않으며, 브라우저를 직접 열지 않습니다. 브라우저는 로그인 명령이 엽니다.
+- **로그인 방법**: Claude 구독 계정은 `claude auth login`(앱의 [로그인])으로 로그인합니다. Console 계정은 터미널에서 `claude auth login --console`을 직접 실행하세요. Codex의 ChatGPT 계정은 `codex login`(앱의 [로그인])이고, 기기 코드 로그인(`codex login --device-auth`)과 API 키 로그인은 공식 문서대로 직접 하세요.
+- **Codex 설치 중의 질문**: npm으로 깐 Codex를 지울지, 끝에 Codex를 바로 시작할지(`Start Codex now?`)를 물으면 창에서 직접 답합니다. 바로 시작하지 않아도 됩니다. Codex 공식 문서는 Windows 11을 권장하고 오래된 Windows 10 빌드는 권장하지 않습니다.
+- **Codex**: 설치·로그인만 되고 채팅창 연결은 준비 중입니다. 설치한 Codex는 위 [AI 연동 (MCP)](#ai-연동-mcp) 절의 Codex 등록에 쓸 수 있습니다.
+- **보안 프로그램**: 보안 프로그램이 작업 창 열기를 막을 수 있습니다. 그러면 결과 줄에 "Windows Terminal 창을 열지 못했습니다."가 보이고 [명령 복사]로 직접 실행할 수 있습니다.
+
+직접 설치하는 공식 대안도 있습니다. Claude Code는 WinGet(`winget install Anthropic.ClaudeCode`, 자동 업데이트 없음)이나 npm(`npm install -g @anthropic-ai/claude-code`, Node.js 22 이상), Codex는 npm(`npm install -g @openai/codex`)으로 설치할 수 있습니다. 이렇게 깐 것은 PATH에 있거나 npm이 만드는 표준 `.cmd`일 때 앱이 찾습니다.
 
 ### 열기
 
@@ -335,8 +377,16 @@ AI가 BeaverBank 도구로 읽은 계좌·카드 이름, 금융기관, 끝자리
 
 ### 문제 해결
 
-- **없음**: Claude Code 설치와 PATH를 확인하세요. `.cmd`·`.bat`라면 위 준비의 지원 형식이 아닐 수 있으니 공식 설치판을 쓰세요. 그다음 ‘다시 확인’을 누릅니다.
-- **로그인 필요**: 터미널에서 `claude`로 로그인한 뒤 ‘다시 확인’을 누르세요. 앱은 브라우저나 로그인 명령을 실행하지 않습니다.
+- **없음**: 안내 상자의 [설치]로 설치하거나, 직접 설치한 뒤 ‘다시 확인’을 누르세요.
+- **설치했는데 없음**: 공식 설치 위치(`%USERPROFILE%\.local\bin\claude.exe`, `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin\codex.exe`)에 있는지, 다른 방법으로 깔았다면 PATH에 있는지 확인하세요. npm으로 깔았다면 npm이 만든 `.cmd`를 고치지 않은 표준 꼴이어야 합니다.
+- **로그인 필요**: 안내 상자의 [로그인]을 누르고 확인 팝업에서 승인하면 Windows Terminal 창에서 `claude auth login`이 실행됩니다. 브라우저에서 로그인을 마친 뒤 창을 닫으세요. 터미널에서 직접 로그인한 뒤 ‘다시 확인’을 눌러도 됩니다. 앱은 승인 없이 로그인 명령을 실행하지 않고, 브라우저를 직접 열지 않습니다.
+- **"Windows Terminal이 필요합니다"가 보임**: Windows Terminal이 없거나 찾지 못한 경우입니다. 위 안내대로 설치하거나, [명령 복사]로 복사한 명령을 PowerShell 창에서 직접 실행한 뒤 ‘다시 확인’을 누르세요.
+- **작업 창이 열리지 않음**: 보안 프로그램이 막았을 수 있습니다. 결과 줄과 함께 [명령 복사]가 보이면 그 명령을 직접 실행하세요. 사용자 폴더나 앱 데이터 폴더 경로에 `;`가 있으면 Windows Terminal이 명령 줄을 나누므로 창을 열지 않고 [명령 복사]만 보입니다.
+- **작업 창 상태를 확인하지 못함**: 앱이 창 감시를 다시 시도하는 중입니다. 창 종료가 확인될 때까지 다른 설치·로그인 작업은 잠겨 있고, Claude Code 작업이면 채팅도 잠겨 있습니다. 안내가 계속되면 작업 창이 닫혔는지 직접 확인한 뒤 BeaverBank를 완전히 껐다 켜세요. [다시 확인]은 클라이언트 상태만 확인하며, 창 종료를 증명하거나 잠금을 풀지 않습니다. 화면 새로고침도 감시를 이어 갑니다. 앱은 Windows Terminal이나 작업 창을 강제로 닫지 않습니다.
+- **작업 창에 오류가 나고 바로 끝남·설치 실패**: 창에 나온 안내를 확인하세요. 네트워크 연결, 지원 국가, 백신의 파일 잠금이 원인일 수 있습니다. Claude Code 공식 문제 해결 문서(https://code.claude.com/docs/en/troubleshoot-install)를 참고하세요. 창은 Enter를 누를 때까지 열려 있습니다.
+- **브라우저가 열리지 않음**: 브라우저는 로그인 명령이 엽니다. 창에 로그인 주소가 보이면 직접 열어 로그인하세요. Codex는 공식 문서의 기기 코드 로그인을 터미널에서 직접 쓸 수 있습니다.
+- **관리자 권한으로 실행함**: 관리자 권한으로 실행한 BeaverBank에서는 설치·로그인을 시작하지 않습니다. 보통 권한으로 다시 실행하세요.
+- **판정용 명령 바꾸기 경고가 보임**: 환경 변수 `BEAVERBANK_SETUP_COMMANDS`가 설정되어 설치 명령이 판정용 명령으로 바뀐 상태입니다. 평소 사용에서는 이 변수를 지우고 앱을 다시 실행하세요.
 - **검증되지 않은 판**: 2.1.284보다 낮거나 판을 알 수 없을 때 나옵니다. 대화는 막지 않고 도구 격리 검사도 그대로 하지만, 업데이트를 권장합니다.
 - **허용되지 않은 도구로 멈춤**: BeaverBank 밖의 도구가 보이거나 실행 순서가 맞지 않아 답을 멈춘 상태입니다. Claude Code의 판과 설정을 확인한 뒤 다시 시도하세요.
 - **데모 데이터 없음**: 데모 앱을 한 번 실행해 가짜 데이터를 준비한 뒤 다시 시도하세요. 실제 데이터로 저절로 바꾸지 않습니다.
@@ -354,7 +404,7 @@ AI가 BeaverBank 도구로 읽은 계좌·카드 이름, 금융기관, 끝자리
 - [x] 6단계: 그래픽 효과
 - [ ] 7단계: 바탕화면 반투명 위젯
 - [x] AI 연동: MCP 읽기·쓰기 서버와 앱 화면 자동 반영
-- [x] AI 채팅창: Claude Code 대화·기입 확인·모델 선택·붙음/덮음 배치 (Codex 준비 중)
+- [x] AI 채팅창: Claude Code 대화·기입 확인·모델 선택·붙음/덮음 배치·Claude Code·Codex 설치·로그인 도우미 (Codex 대화 준비 중)
 - [ ] 이후: 파티클과 3D 효과
 
 ## 라이선스

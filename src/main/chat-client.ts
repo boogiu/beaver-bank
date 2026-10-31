@@ -1,5 +1,5 @@
 import { app, BrowserWindow, clipboard, ipcMain } from 'electron'
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -11,6 +11,7 @@ import {
   type ChatSnapshot,
   type ChatRequest,
   type ChatReply,
+  type ChatSetupAction,
   type ChatSetupTask,
   type ChatStatus
 } from '../shared/chat'
@@ -19,7 +20,21 @@ import { checkChatData, readChatNames } from './chat-data'
 import { writeToolNames } from '../shared/chat-gate'
 import { ChatApproval } from './chat-approval'
 import { findClient, findNode, type ChatClientName, type Executable } from './chat-find'
-import { integrity, judge, readFacts, taskFor } from './chat-setup'
+import {
+  copyText,
+  hasSemicolon,
+  integrity,
+  judge,
+  openFailed,
+  readFacts,
+  resultLine,
+  setupReasons,
+  setupWindow,
+  taskFor,
+  watchScript,
+  type SetupFacts,
+  type SetupWindow
+} from './chat-setup'
 
 const instructions = [
   'BeaverBank는 용도별 계좌와 정기 흐름으로 돈을 관리하는 앱이고, 건별 지출 가계부가 아니다.',
@@ -205,6 +220,7 @@ export class ChatClient {
   }
   private checking?: Promise<void>
   private codexChecking?: Promise<void>
+  private checkAbort: Partial<Record<ChatClientName, AbortController>> = {}
   private checks = new Set<Managed>()
   private checked = false
   private lifecycle = 0
@@ -223,11 +239,35 @@ export class ChatClient {
     finish: (state: ChatReply['state'], error?: string, clear?: boolean) => Promise<void>
   }
   private runFolder = join(app.getPath('userData'), 'chat', 'run')
+  private setupFolder = join(app.getPath('userData'), 'chat', 'setup')
+  // 승인 직전에 준비한 작업 창(한 번만 쓴다, CS-48)
+  private pending?: SetupWindow
+  // 열려 있는 작업 창. 감시는 다시 불러오기에도 이어지고 앱 종료 때만 그친다(CS-37, CS-44).
+  private window?: {
+    task: ChatSetupTask
+    client: ChatClientName
+    token: string
+    watcher?: ChildProcess
+    retry?: ReturnType<typeof setTimeout>
+    identity?: { pid: number; created: string }
+    watchFailure?: { since: number; elapsedMs: number }
+    phase: 'finding' | 'found' | 'done'
+  }
+  // 창을 열지 못한 작업(CS-41). 그 클라이언트의 다음 상태 확인이 끝나거나 다음 작업을 시작할 때까지 명령 복사다.
+  private failed: Partial<Record<ChatClientName, ChatSetupTask>> = {}
+  // 창이 닫힌 뒤 결과 줄을 정할 작업(CS-43)
+  private awaiting: Partial<Record<ChatClientName, ChatSetupTask>> = {}
   constructor() {
     mkdirSync(this.runFolder, { recursive: true })
     for (const name of readdirSync(this.runFolder))
       if (/^[\da-f-]+\.(mcp\.json|settings\.json|instructions\.txt)$/.test(name))
         rmSync(join(this.runFolder, name), { force: true })
+    // 켤 때 남은 표지 파일만 지운다(CS-46). 그 전에 연 작업 창은 지켜보지 않는다. 폴더가 없으면 만들지 않는다.
+    if (existsSync(this.setupFolder))
+      for (const name of readdirSync(this.setupFolder))
+        if (/^[0-9a-f]{32}\.open$/.test(name)) rmSync(join(this.setupFolder, name), { force: true })
+    // 앱을 끌 때만 작업 창 감시를 그친다. 창 PowerShell과 Windows Terminal은 끝내지 않는다(CS-44).
+    app.on('before-quit', () => this.stopWatching())
   }
   private publish(): void {
     this.refreshSetup()
@@ -235,23 +275,233 @@ export class ChatClient {
     for (const window of BrowserWindow.getAllWindows())
       if (!window.webContents.isDestroyed()) window.webContents.send('chat:changed', this.snapshot)
   }
+  private facts(): SetupFacts {
+    // 권한 확인이 아직 없거나 진행 중이면 판정을 미룬다(작업 표시 없음).
+    const admin = this.admin ?? (this.adminCheck || !this.adminTried ? 'pending' : 'unknown')
+    return readFacts(this.setupFolder, admin)
+  }
   // 상태에 맞는 작업마다 선행 조건과 명령 복사를 다시 판정한다. 작업이 없으면 파일을 보지 않는다.
+  // 작업 창이 열려 있으면 모든 작업 단추가, 답을 받는 동안에는 Claude 작업 단추가 흐리다(CS-47, CS-49).
   private refreshSetup(): void {
     const tasks = {
       claude: taskFor('claude', this.snapshot.status),
       codex: taskFor('codex', this.snapshot.codex)
     }
-    // 권한 확인이 아직 없거나 진행 중이면 판정을 미룬다(작업 표시 없음).
-    const admin = this.admin ?? (this.adminCheck || !this.adminTried ? 'pending' : 'unknown')
-    const facts =
-      tasks.claude || tasks.codex
-        ? readFacts(join(app.getPath('userData'), 'chat', 'setup'), admin)
-        : undefined
-    this.snapshot.setup = {
-      claude: tasks.claude && facts && judge(tasks.claude, facts, this.found.claude),
-      codex: tasks.codex && facts && judge(tasks.codex, facts, this.found.codex),
-      copy: this.snapshot.setup.copy
+    const facts = tasks.claude || tasks.codex ? this.facts() : undefined
+    const action = (client: ChatClientName): ChatSetupAction | undefined => {
+      const task = tasks[client]
+      const value = task && facts && judge(task, facts, this.found[client])
+      if (!value || value.mode === 'blocked') return value
+      // 창을 열지 못한 작업은 명령 복사다(CS-41, CS-80 셋째 경우).
+      if (value.mode === 'window' && this.failed[client] === value.task) {
+        const command = copyText(value.task, this.found[client], facts.override)
+        return { ...value, mode: 'copy', notice: openFailed, command, title: undefined }
+      }
+      const busy =
+        value.mode !== 'window'
+          ? undefined
+          : this.window
+            ? setupReasons.busy
+            : client === 'claude' && this.run
+              ? setupReasons.replying
+              : undefined
+      return busy && !value.disabled ? { ...value, dimmed: true, disabled: busy } : value
     }
+    this.snapshot.setup = {
+      claude: action('claude'),
+      codex: action('codex'),
+      copy: this.snapshot.setup.copy,
+      pending: this.snapshot.setup.pending,
+      running: this.snapshot.setup.running,
+      results: this.snapshot.setup.results
+    }
+  }
+  // 실행 확인 팝업을 열 때: main이 다시 판단하고, 창 작업이면 새 토큰과 창 명령 줄을 준비만 한다(프로세스 없음).
+  private prepareWindow(task: ChatSetupTask): void {
+    this.pending = undefined
+    this.snapshot.setup.pending = undefined
+    this.refreshSetup()
+    const client: ChatClientName = task.startsWith('claude') ? 'claude' : 'codex'
+    const action = this.snapshot.setup[client]
+    if (action?.task !== task || action.mode !== 'window' || action.dimmed) return
+    const window = setupWindow(task, this.facts(), this.found[client])
+    if (!window || hasSemicolon(window)) return
+    this.pending = window
+    this.snapshot.setup.pending = {
+      task,
+      token: window.token,
+      title: window.title,
+      display: window.display
+    }
+  }
+  // 승인(CS-25, CS-47, CS-48): 준비한 작업·토큰과 같고, 다시 판단해도 시작할 수 있을 때만 그 인수 그대로 연다.
+  private startWindow(task: ChatSetupTask, token: string): void {
+    const window = this.pending
+    this.pending = undefined
+    this.snapshot.setup.pending = undefined
+    if (!window || window.task !== task || window.token !== token || this.window) return
+    this.refreshSetup()
+    const client: ChatClientName = task.startsWith('claude') ? 'claude' : 'codex'
+    const action = this.snapshot.setup[client]
+    if (action?.task !== task || action.mode !== 'window' || action.dimmed) return
+    this.openWindow(window, client)
+  }
+  // 작업 창을 여는 곳은 여기 하나다(CS-30, CS-31, CS-34, CS-35). wt.exe를 셸 없이, 창을 숨기지 않고,
+  // 표준 입출력을 잇지 않고, 분리하지 않고 연다. 환경 변수는 앱 것 그대로다(CS-36). managed()를 쓰지 않아
+  // 정리 코드의 taskkill이 작업 창에 닿지 않는다. wt.exe의 끝·종료 코드로 결과를 판단하지 않는다(CS-32).
+  private openWindow(window: SetupWindow, client: ChatClientName): void {
+    const approvedAt = Date.now()
+    this.window = { task: window.task, client, token: window.token, phase: 'finding' }
+    this.snapshot.setup.running = { task: window.task, client, title: window.title }
+    delete this.failed[client]
+    delete this.awaiting[client]
+    if (this.snapshot.setup.results) delete this.snapshot.setup.results[client]
+    // spawn()이 수백 ms 돌아오지 않을 수 있어 "작업 중"을 먼저 보이고 다음 차례에 띄운다.
+    this.publish()
+    setImmediate(() => {
+      const state = this.window
+      if (state?.token !== window.token) return
+      let child: ChildProcess
+      const started = Date.now()
+      try {
+        mkdirSync(this.setupFolder, { recursive: true })
+        child = spawn(window.program, window.args, {
+          shell: false,
+          windowsHide: false,
+          stdio: 'ignore',
+          cwd: process.env.USERPROFILE
+        })
+      } catch {
+        this.windowFailed(window.token)
+        return
+      }
+      if (this.snapshot.setup.running?.task === window.task)
+        this.snapshot.setup.running.spawnMs = Date.now() - started
+      child.on('error', () => this.windowFailed(window.token))
+      // 시작 뒤 10초 안에 찾아야 한다. 결과 줄이 승인 뒤 10초 안에 보이게 조금 앞서 판단한다(CS-41).
+      this.watch(window, Math.max(1000, approvedAt + 9000 - Date.now()))
+    })
+  }
+  // 창 없는 감시 하나가 토큰으로 창 PowerShell을 찾고, 그 프로세스가 끝나면 알린다(CS-32, CS-42).
+  // this.checks에 넣지 않고 lifecycle과 무관하다(다시 불러오기에도 이어짐).
+  private watch(window: SetupWindow, findMs: number): void {
+    const state = this.window
+    if (!state || state.token !== window.token) return
+    const findUntil = Date.now() + findMs
+    const watcher = spawn(
+      system('WindowsPowerShell/v1.0/powershell.exe'),
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-Command',
+        watchScript(window.token, window.marker, findMs, state.identity)
+      ],
+      { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }
+    )
+    state.watcher = watcher
+    let output = ''
+    let verdict: 'found' | 'notfound' | 'closed' | undefined
+    watcher.stdout.on('data', (chunk) => {
+      output += chunk.toString()
+      for (const line of output.split(/\r?\n/).slice(0, -1)) {
+        if (line.startsWith('found ')) {
+          const found = /^found (\d+) (\S+)$/.exec(line)
+          if (
+            found &&
+            this.window === state &&
+            state.watcher === watcher &&
+            state.phase !== 'done'
+          ) {
+            verdict = 'found'
+            state.phase = 'found'
+            state.identity = { pid: Number(found[1]), created: found[2] }
+            if (state.watchFailure) {
+              state.watchFailure = undefined
+              if (this.snapshot.setup.running) delete this.snapshot.setup.running.watchFailure
+              this.publish()
+            }
+          }
+        } else if (line === 'notfound' || line === 'closed') verdict = line
+      }
+      output = output.slice(output.lastIndexOf('\n') + 1)
+    })
+    const retry = (): void => {
+      if (this.window !== state || state.phase === 'done' || state.watcher !== watcher) return
+      state.watcher = undefined
+      const now = Date.now()
+      state.watchFailure ??= { since: now, elapsedMs: 0 }
+      state.watchFailure.elapsedMs = now - state.watchFailure.since
+      if (this.snapshot.setup.running)
+        this.snapshot.setup.running.watchFailure = { ...state.watchFailure }
+      this.publish()
+      // 감시 상실은 창 닫힘이 아니다. 작업 중 안내·잠금을 유지하고 같은 창을 다시 조회한다.
+      state.retry = setTimeout(() => {
+        state.retry = undefined
+        this.watch(window, Math.max(0, findUntil - Date.now()))
+      }, 400)
+    }
+    watcher.on('error', retry)
+    watcher.on('close', (code) => {
+      if (this.window !== state || state.phase === 'done' || state.watcher !== watcher) return
+      if (code === 0 && verdict === 'closed') this.windowClosed(window.token)
+      else if (code === 0 && verdict === 'notfound' && state.phase === 'finding')
+        this.windowFailed(window.token)
+      else retry()
+    })
+  }
+  // 창을 열지 못함(CS-41): 상태는 그대로, 결과 줄, 그 작업은 명령 복사.
+  private windowFailed(token: string): void {
+    const state = this.window
+    if (state?.token !== token || state.phase === 'done') return
+    state.phase = 'done'
+    clearTimeout(state.retry)
+    this.window = undefined
+    state.watcher?.kill()
+    this.snapshot.setup.running = undefined
+    this.failed[state.client] = state.task
+    this.snapshot.setup.results = {
+      ...this.snapshot.setup.results,
+      [state.client]: { task: state.task, ok: false, text: openFailed }
+    }
+    this.publish()
+  }
+  // 창이 닫힘(CS-42): 2초 안에 그 클라이언트의 상태 확인을 시작하고, 끝나면 결과 줄을 정한다(CS-43).
+  private windowClosed(token: string): void {
+    const state = this.window
+    if (state?.token !== token || state.phase === 'done') return
+    state.phase = 'done'
+    clearTimeout(state.retry)
+    this.window = undefined
+    this.snapshot.setup.running = undefined
+    const client = state.client
+    // 닫히기 전 확인은 취소하고 정리만 기다린다. 남은 상태 명령은 실행하지 않는다(CS-19, CS-42).
+    const inflight = client === 'claude' ? this.checking : this.codexChecking
+    this.checkAbort[client]?.abort()
+    const recheck = (): Promise<void> => {
+      this.awaiting[client] = state.task
+      return client === 'claude' ? this.check() : this.checkCodex()
+    }
+    if (inflight) void inflight.finally(recheck)
+    else void recheck()
+    this.publish()
+  }
+  // 앱 종료 때 우리 감시 조회 프로세스만 그친다. 창 PowerShell·Windows Terminal에는 닿지 않는다(CS-44).
+  private stopWatching(): void {
+    const state = this.window
+    if (!state) return
+    state.phase = 'done'
+    clearTimeout(state.retry)
+    state.watcher?.kill()
+  }
+  // 상태 확인이 끝날 때: 창이 닫힌 뒤의 확인이면 결과 줄을 정하고, 아니면 그 클라이언트의 결과 줄과 명령 복사 대체를 지운다.
+  private settleSetup(client: ChatClientName, status: ChatStatus): void {
+    const task = this.awaiting[client]
+    delete this.awaiting[client]
+    delete this.failed[client]
+    const results = { ...this.snapshot.setup.results }
+    if (task) results[client] = resultLine(task, status)
+    else delete results[client]
+    this.snapshot.setup.results = results
   }
   // 관리자 판정(CS-39): whoami의 무결성 SID. 결과가 필요해질 때 처음 한 번 실행한다.
   private ensureAdmin(): Promise<void> {
@@ -299,10 +549,17 @@ export class ChatClient {
     exe: Executable,
     args: string[],
     deadline: number,
-    read = true
+    read = true,
+    signal?: AbortSignal
   ): Promise<{ code: number | null; text: string }> {
+    if (signal?.aborted) return { code: null, text: '' }
     const task = managed(exe.command, [...exe.prefix, ...args])
     this.checks.add(task)
+    // 자기 상태 명령만 중단한다. 창 PowerShell과 그 감시는 this.checks 밖에 있다.
+    const abort = (): void => {
+      task.child.kill()
+    }
+    signal?.addEventListener('abort', abort, { once: true })
     try {
       return await new Promise((resolve) => {
         let text = ''
@@ -328,6 +585,7 @@ export class ChatClient {
         })
       })
     } finally {
+      signal?.removeEventListener('abort', abort)
       await task.close()
       this.checks.delete(task)
     }
@@ -336,38 +594,49 @@ export class ChatClient {
     if (this.checking) return this.checking
     this.checked = true
     const lifecycle = this.lifecycle
+    const controller = new AbortController()
+    this.checkAbort.claude = controller
+    const signal = controller.signal
     this.snapshot.status = { state: 'checking' }
     this.publish()
     // 결과는 권한 확인까지 마친 뒤 한 번에 싣는다. 진행 중 확인에 [다시 확인]이 묻히지 않게 한다.
     this.checking = (async () => {
-      const status = await this.readClaude(lifecycle)
-      if (!status) return
+      const status = await this.readClaude(lifecycle, signal)
+      if (!status || signal.aborted) return
       await this.prepareSetup(lifecycle, status, this.snapshot.codex)
-      if (lifecycle === this.lifecycle) this.snapshot.status = status
+      if (lifecycle === this.lifecycle && !signal.aborted) {
+        this.snapshot.status = status
+        this.settleSetup('claude', status)
+      }
     })().finally(() => {
       this.checking = undefined
+      delete this.checkAbort.claude
       this.publish()
     })
     return this.checking
   }
-  private async readClaude(lifecycle: number): Promise<ChatStatus | undefined> {
+  private async readClaude(
+    lifecycle: number,
+    signal: AbortSignal
+  ): Promise<ChatStatus | undefined> {
     const exe = findClient('claude')
     this.found.claude = exe
     if (!exe) return { state: 'missing' }
     const deadline = Date.now() + 10000
     let timeout = false
     const timer = setTimeout(() => {
+      if (signal.aborted) return
       timeout = true
       this.snapshot.status = { state: 'unknown' }
       this.publish()
     }, 10000)
     try {
-      const versionResult = await this.statusCommand(exe, ['-v'], deadline)
-      if (lifecycle !== this.lifecycle) return undefined
+      const versionResult = await this.statusCommand(exe, ['-v'], deadline, true, signal)
+      if (lifecycle !== this.lifecycle || signal.aborted) return undefined
       if (versionResult.code !== 0 || Date.now() >= deadline) return { state: 'unknown' }
       const version = versionResult.text.match(/\b(\d+\.\d+\.\d+)\b/)?.[1]
-      const auth = await this.statusCommand(exe, ['auth', 'status'], deadline)
-      if (lifecycle !== this.lifecycle) return undefined
+      const auth = await this.statusCommand(exe, ['auth', 'status'], deadline, true, signal)
+      if (lifecycle !== this.lifecycle || signal.aborted) return undefined
       if (timeout || auth.code === null) return { state: 'unknown' }
       let loggedIn: boolean | undefined
       try {
@@ -393,37 +662,45 @@ export class ChatClient {
   async checkCodex(): Promise<void> {
     if (this.codexChecking) return this.codexChecking
     const lifecycle = this.lifecycle
+    const controller = new AbortController()
+    this.checkAbort.codex = controller
+    const signal = controller.signal
     this.snapshot.codex = { state: 'checking' }
     this.publish()
     this.codexChecking = (async () => {
-      const status = await this.readCodex(lifecycle)
-      if (!status) return
+      const status = await this.readCodex(lifecycle, signal)
+      if (!status || signal.aborted) return
       await this.prepareSetup(lifecycle, this.snapshot.status, status)
-      if (lifecycle === this.lifecycle) this.snapshot.codex = status
+      if (lifecycle === this.lifecycle && !signal.aborted) {
+        this.snapshot.codex = status
+        this.settleSetup('codex', status)
+      }
     })().finally(() => {
       this.codexChecking = undefined
+      delete this.checkAbort.codex
       this.publish()
     })
     return this.codexChecking
   }
-  private async readCodex(lifecycle: number): Promise<ChatStatus | undefined> {
+  private async readCodex(lifecycle: number, signal: AbortSignal): Promise<ChatStatus | undefined> {
     const exe = findClient('codex')
     this.found.codex = exe
     if (!exe) return { state: 'missing' }
     const deadline = Date.now() + 10000
     let timeout = false
     const timer = setTimeout(() => {
+      if (signal.aborted) return
       timeout = true
       this.snapshot.codex = { state: 'unknown' }
       this.publish()
     }, 10000)
     try {
-      const versionResult = await this.statusCommand(exe, ['--version'], deadline)
-      if (lifecycle !== this.lifecycle) return undefined
+      const versionResult = await this.statusCommand(exe, ['--version'], deadline, true, signal)
+      if (lifecycle !== this.lifecycle || signal.aborted) return undefined
       const version = versionResult.text.match(/(?<![\d.])(\d+\.\d+\.\d+)(?![\d.])/)?.[1]
       if (timeout || versionResult.code !== 0 || !version) return { state: 'unknown' }
-      const login = await this.statusCommand(exe, ['login', 'status'], deadline, false)
-      if (lifecycle !== this.lifecycle) return undefined
+      const login = await this.statusCommand(exe, ['login', 'status'], deadline, false, signal)
+      if (lifecycle !== this.lifecycle || signal.aborted) return undefined
       return timeout || login.code === null
         ? { state: 'unknown' }
         : { state: login.code === 0 ? 'ready' : 'login', version }
@@ -481,10 +758,31 @@ export class ChatClient {
       chatSetupTasks.includes(request.task)
     )
       await this.copy(request.task)
+    // 실행 확인 팝업(CS-25): 준비 → 승인(시작) 또는 취소. 시작은 main이 다시 판단한다(CS-47, CS-48).
+    if (
+      request.kind === 'setup-prepare' &&
+      Object.keys(request).every((key) => key === 'kind' || key === 'task') &&
+      chatSetupTasks.includes(request.task)
+    )
+      this.prepareWindow(request.task)
+    if (
+      request.kind === 'setup-start' &&
+      Object.keys(request).every((key) => ['kind', 'task', 'token'].includes(key)) &&
+      chatSetupTasks.includes(request.task) &&
+      typeof request.token === 'string'
+    )
+      this.startWindow(request.task, request.token)
+    if (request.kind === 'setup-cancel') {
+      this.pending = undefined
+      this.snapshot.setup.pending = undefined
+    }
+    // Claude 작업 창이 열려 있으면 보내기와 다시 시도를 받지 않는다(CS-49).
+    const working = this.window?.client === 'claude'
     if (
       request.kind === 'send' &&
       request.epoch === this.snapshot.epoch &&
       !this.run &&
+      !working &&
       typeof request.text === 'string' &&
       request.text.trim() &&
       request.text.length <= 4000
@@ -501,7 +799,12 @@ export class ChatClient {
       this.snapshot.replies.push(reply)
       void this.start(reply)
     }
-    if (request.kind === 'retry' && request.epoch === this.snapshot.epoch && !this.run) {
+    if (
+      request.kind === 'retry' &&
+      request.epoch === this.snapshot.epoch &&
+      !this.run &&
+      !working
+    ) {
       const reply = this.snapshot.replies.find(
         (item) => item.id === request.id && item.state === 'error'
       )
@@ -614,7 +917,7 @@ export class ChatClient {
         void this.check()
         return
       }
-      if (this.snapshot.status.state !== 'ready') {
+      if (this.snapshot.status.state !== 'ready' || this.window?.client === 'claude') {
         await finish('error', errors.login)
         void this.check()
         return
@@ -905,7 +1208,10 @@ export class ChatClient {
       await finish('error', errors.other)
     }
   }
+  // 다시 불러오기·렌더러 종료·앱 종료 때의 정리. 작업 창과 그 감시는 건드리지 않는다(CS-37). 감시는 앱 종료 때만 그친다.
   async dispose(): Promise<void> {
+    this.pending = undefined
+    this.snapshot.setup.pending = undefined
     this.lifecycle++
     this.snapshot.epoch = randomUUID()
     if (this.snapshot.status.state === 'checking') this.snapshot.status = { state: 'unknown' }

@@ -99,24 +99,39 @@ export function ChatConnection({
   busy,
   onSource,
   onWrite,
-  onTools
+  onTools,
+  onUpdate
 }: {
   chat: ChatSnapshot
   busy: boolean
   onSource: (source: ChatSource) => void
   onWrite: () => void
   onTools: () => void
+  onUpdate: () => void
 }): React.JSX.Element {
   const status = chat.status
-  // 01에서는 명령 복사 경우에만 판 안내 뒤에 "업데이트"가 있고 AI 도구 팝업을 연다(CS-24).
-  const update = chat.setup.claude?.task === 'claude-update' && chat.setup.claude.mode === 'copy'
-  const reason = {
-    missing: '없음',
-    login: '로그인 필요',
-    unknown: '확인하지 못함',
-    checking: '',
-    ready: status.verified ? '' : '검증되지 않은 판'
-  }[status.state]
+  // 판을 읽었고 2.1.284 미만이면 판 안내 뒤에 "업데이트"(CS-24). 창 작업이면 Claude 업데이트의 실행 확인 팝업,
+  // 명령 복사면 AI 도구 팝업을 연다. 시작할 수 없으면 흐리고 마우스를 올리면 이유가 보인다.
+  const action = chat.setup.claude
+  const update =
+    action?.task === 'claude-update' && (action.mode === 'copy' || action.mode === 'window')
+      ? action
+      : undefined
+  const updateDimmed = update?.mode === 'window' && update.dimmed
+  const running = chat.setup.running?.client === 'claude' ? chat.setup.running : undefined
+  const reason = running
+    ? running.task === 'claude-install'
+      ? '설치 중'
+      : running.task === 'claude-login'
+        ? '로그인 중'
+        : '업데이트 중'
+    : {
+        missing: '없음',
+        login: '로그인 필요',
+        unknown: '확인하지 못함',
+        checking: '',
+        ready: status.verified ? '' : '검증되지 않은 판'
+      }[status.state]
   return (
     <section className="chat-connection">
       <div className="chat-clients" role="radiogroup" aria-label="클라이언트">
@@ -129,10 +144,15 @@ export function ChatConnection({
             if (event.key.startsWith('Arrow')) event.preventDefault()
           }}
         >
-          <span className={`chat-status-dot ${status.state}`} />
+          <span className={`chat-status-dot ${running ? 'working' : status.state}`} />
           Claude
           {reason && (
-            <small className={status.state === 'ready' ? 'chat-warning' : ''}> · {reason}</small>
+            <small
+              className={running ? 'chat-working' : status.state === 'ready' ? 'chat-warning' : ''}
+            >
+              {' '}
+              · {reason}
+            </small>
           )}
         </button>
         <button
@@ -205,7 +225,16 @@ export function ChatConnection({
                 검증되지 않은 Claude Code 판({status.version || '알 수 없음'})입니다. 2.1.284
                 이상에서 확인했습니다.
                 {update && (
-                  <button type="button" className="chat-update-link" onClick={onTools}>
+                  <button
+                    type="button"
+                    className="chat-update-link"
+                    aria-disabled={updateDimmed || undefined}
+                    title={updateDimmed ? update.disabled : undefined}
+                    onClick={() => {
+                      if (update.mode === 'copy') onTools()
+                      else if (!updateDimmed) onUpdate()
+                    }}
+                  >
                     업데이트
                   </button>
                 )}
