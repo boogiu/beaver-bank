@@ -11,6 +11,15 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!.skywork/**'
+  - '!.claude/**'
+  - '!release/**'
+  - '!dist/**'
+  - '!data/**'
+  - '!backup/**'
+  - '!**/*.{sqlite,sqlite3,sqlite-journal,sqlite-wal,sqlite-shm,db,db-journal,db-wal,db-shm,bak}'
+  - '!.github/**'
+  - '!.vscode/**'
 # DB 마이그레이션 SQL은 앱 시작 시 읽어야 하므로 resources/drizzle로 복사한다.
 extraResources:
   - from: drizzle
