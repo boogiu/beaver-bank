@@ -6,6 +6,7 @@ import type { ApiError, Purpose, PurposeAmount } from '@shared/ipc'
 import type { PageProps } from '../App'
 import { AddButton, Button, EmptyState, Icon, PurposeAmountLabel } from '../components/Ui'
 import { ConfirmModal, Field, Modal } from '../components/Modal'
+import { ShareBar } from '../components/ShareBar'
 
 import { PURPOSE_COLORS } from '@shared/domain'
 
@@ -97,6 +98,12 @@ export default function PurposesPage({ target }: PageProps): React.JSX.Element {
     if (target?.kind !== 'purpose') return
     document.getElementById(`purpose-${target.id}`)?.scrollIntoView({ block: 'center' })
   }, [target, loaded])
+  // 대시보드와 같은 셈: 양수 금액 합계(용도 없음 포함)에서 차지하는 비율, 소수 첫째 자리
+  const positiveTotal = amounts.reduce((sum, row) => sum + Math.max(0, row.amount ?? 0), 0)
+  const share = (id: number): number | null => {
+    const amount = amounts.find((row) => row.purposeId === id)?.amount ?? null
+    return amount !== null && amount > 0 ? Math.round((amount * 1000) / positiveTotal) / 10 : null
+  }
   const remove = async (): Promise<void> => {
     if (!removing) return
     const result = await window.api.deletePurpose(removing.id)
@@ -167,6 +174,9 @@ export default function PurposesPage({ target }: PageProps): React.JSX.Element {
                   <span className="color-dot" style={{ backgroundColor: item.color }} />
                   <span className="purpose-name">{item.name}</span>
                   <PurposeAmountLabel value={amounts.find((row) => row.purposeId === item.id)} />
+                  {share(item.id) !== null && (
+                    <span className="muted purpose-share">{share(item.id)!.toFixed(1)}%</span>
+                  )}
                   <Button
                     icon={Pencil}
                     aria-label={`${item.name} 수정`}
@@ -182,6 +192,7 @@ export default function PurposesPage({ target }: PageProps): React.JSX.Element {
                   >
                     삭제
                   </Button>
+                  <ShareBar share={share(item.id)} color={item.color} />
                 </div>
               </Entrance>
             ))}

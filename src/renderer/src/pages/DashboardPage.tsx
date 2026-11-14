@@ -8,6 +8,7 @@ import type { PageProps } from '../App'
 import { Button, EmptyState, Icon } from '../components/Ui'
 import { ACCOUNT_INFO, FLOW_INFO, money } from '../components/domain-ui'
 import DashboardDonut from '../components/DashboardDonut'
+import { ShareBar } from '../components/ShareBar'
 import DashboardTrend from '../components/DashboardTrend'
 
 function AssetAmount({
@@ -47,6 +48,8 @@ export default function DashboardPage({ navigate }: PageProps): React.JSX.Elemen
 
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // 구성 목록과 도넛이 함께 강조하는 용도(용도 없음은 'none')
+  const [active, setActive] = useState<number | 'none' | null>(null)
   useExternalRefresh(async () => {
     try {
       const result = await window.api.getDashboard()
@@ -110,8 +113,12 @@ export default function DashboardPage({ navigate }: PageProps): React.JSX.Elemen
                     {data.assets.composition.map((item) => (
                       <button
                         type="button"
-                        className="dashboard-composition-row"
+                        className={`dashboard-composition-row ${active === (item.purposeId ?? 'none') ? 'active' : ''}`}
                         key={item.purposeId ?? 'none'}
+                        onPointerEnter={() => setActive(item.purposeId ?? 'none')}
+                        onPointerLeave={() => setActive(null)}
+                        onFocus={() => setActive(item.purposeId ?? 'none')}
+                        onBlur={() => setActive(null)}
                         onClick={() =>
                           item.purposeId === null
                             ? navigate('accounts')
@@ -134,11 +141,17 @@ export default function DashboardPage({ navigate }: PageProps): React.JSX.Elemen
                         {item.share !== null && (
                           <span className="muted dashboard-share">{item.share.toFixed(1)}%</span>
                         )}
+                        <ShareBar share={item.share} color={item.color} />
                       </button>
                     ))}
                   </div>
                   {data.assets.composition.some((item) => item.share !== null) ? (
-                    <DashboardDonut items={data.assets.composition} />
+                    <DashboardDonut
+                      items={data.assets.composition}
+                      total={data.assets.total}
+                      active={active}
+                      onActive={setActive}
+                    />
                   ) : (
                     <p className="muted dashboard-no-chart">표시할 금액이 없습니다</p>
                   )}
