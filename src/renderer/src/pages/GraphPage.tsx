@@ -9,6 +9,7 @@ import { Scan } from 'lucide-react'
 import type { Account, Card, Flow, Purpose } from '@shared/ipc'
 import type { PageProps } from '../App'
 import { Button, EmptyState, Switch } from '../components/Ui'
+import RiverGraph from '../components/RiverGraph'
 
 type Kind = 'purpose' | 'account' | 'card' | 'income' | 'payment'
 type Shape = 'large-circle' | 'small-circle' | 'rounded-rectangle' | 'diamond' | 'triangle'
@@ -78,10 +79,10 @@ function starlight(color: string): string {
 }
 const nodeGlow = (node: GraphNode): { opacity: number; innerRadius: number; radius: number } =>
   node.kind === 'purpose'
-    ? { opacity: 1, innerRadius: 8, radius: 15 }
+    ? { opacity: 0.6, innerRadius: 8, radius: 12 }
     : node.kind === 'account'
-      ? { opacity: 0.9, innerRadius: 6, radius: 13 }
-      : { opacity: 0.62, innerRadius: 6, radius: 12 }
+      ? { opacity: 0.5, innerRadius: 6, radius: 9.5 }
+      : { opacity: 0.4, innerRadius: 6, radius: 9 }
 // Presentation-only, deterministic phase. CSS keeps ticking through opacity/view changes.
 function twinkleStyle(node: GraphNode): CSSProperties {
   const seed = node.recordId * 5 + NODE_TYPES.findIndex((type) => type.kind === node.kind)
@@ -245,6 +246,9 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
   const [cards, setCards] = useState<Card[]>([])
   const [flows, setFlows] = useState<Flow[]>([])
   const [showInactive, setShowInactive] = useState(false)
+  // 별자리(힘 배치 그래프)와 물길(샘→연못→댐→하류) 두 가지 보기
+  const [mode, setMode] = useState<'stars' | 'river'>('stars')
+  const [balances, setBalances] = useState(new Map<number, number | null>())
   const [error, setError] = useState<string | null>(null)
   const [size, setSize] = useState({ width: 800, height: 500 })
   const [positions, setPositions] = useState<GraphNode[]>([])
@@ -258,11 +262,12 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
   const pan = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null)
 
   useExternalRefresh(async () => {
-    const [p, a, c, f] = await Promise.all([
+    const [p, a, c, f, b] = await Promise.all([
       window.api.listPurposes(),
       window.api.listAccounts(true),
       window.api.listCards(true),
-      window.api.listFlows()
+      window.api.listFlows(),
+      window.api.listBalances()
     ])
     await document.fonts.ready
     return () => {
@@ -272,6 +277,8 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
         setAccounts(a.data)
         setCards(c.data)
         setFlows(f.data)
+        // 잔액은 물길 보기의 연못 크기에만 쓴다. 읽지 못하면 모두 같은 크기다.
+        if (b.ok) setBalances(new Map(b.data.map((row) => [row.accountId, row.balance])))
         setLoaded(true)
       } else setError('그래프 데이터를 읽지 못했습니다.')
     }
@@ -287,7 +294,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
     })
     observer.observe(element)
     return () => observer.disconnect()
-  }, [purposes, accounts, cards, flows, showInactive])
+  }, [purposes, accounts, cards, flows, showInactive, mode])
 
   const graph = useMemo(
     () => makeGraph(purposes, accounts, cards, flows, showInactive),
@@ -613,9 +620,26 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
             <p>용도와 계좌, 카드, 흐름의 연결을 봅니다.</p>
           </div>
           <div className="page-actions">
+            <div className="view-switch" role="group" aria-label="그래프 보기 선택">
+              <Button
+                variant={mode === 'stars' ? 'primary' : undefined}
+                aria-pressed={mode === 'stars'}
+                onClick={() => setMode('stars')}
+              >
+                별자리 보기
+              </Button>
+              <Button
+                variant={mode === 'river' ? 'primary' : undefined}
+                aria-pressed={mode === 'river'}
+                onClick={() => setMode('river')}
+              >
+                물길 보기
+              </Button>
+            </div>
             <Switch label="해지 항목 보기" checked={showInactive} onChange={setShowInactive} />
             <Button
               icon={Scan}
+              disabled={mode === 'river'}
               onClick={() => {
                 autoFit.current = true
                 const element = region.current
@@ -642,6 +666,31 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
               title="표시할 항목이 없습니다"
               description="용도, 계좌 또는 카드를 추가해 보세요."
             />
+          </Entrance>
+        ) : mode === 'river' ? (
+          <Entrance order={entranceIndex++}>
+            <div className="graph-region river-region panel">
+              <RiverGraph
+                purposes={purposes}
+                accounts={accounts}
+                cards={cards}
+                flows={flows}
+                balances={balances}
+                showInactive={showInactive}
+                onOpen={(target) =>
+                  navigate(
+                    target.kind === 'purpose'
+                      ? 'purposes'
+                      : target.kind === 'account'
+                        ? 'accounts'
+                        : target.kind === 'card'
+                          ? 'cards'
+                          : 'flows',
+                    target
+                  )
+                }
+              />
+            </div>
           </Entrance>
         ) : (
           <Entrance order={entranceIndex++}>
@@ -830,12 +879,16 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                                   ? 1
                                   : 0.15
                                 : 0.5,
+                            // 계좌와 용도를 잇는 선은 그 용도의 별빛 색이라 묶음이 별자리처럼 읽힌다.
                             stroke:
                               link.kind === 'account-payment'
                                 ? '#F5CB6A'
                                 : ['income-account', 'account-transfer'].includes(link.kind)
                                   ? '#7DE2FA'
-                                  : 'var(--muted)'
+                                  : link.kind === 'account-purpose'
+                                    ? b.color
+                                    : 'var(--muted)',
+                            strokeWidth: emphasized ? 1.6 : 1
                           }}
                           x1={(a.x ?? 0) + ux * (radius(a) + (link.reverse ? 6 : 0))}
                           y1={(a.y ?? 0) + uy * (radius(a) + (link.reverse ? 6 : 0))}
@@ -904,7 +957,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                     return (
                       <g
                         key={node.id}
-                        className={`graph-node ${node.inactive ? 'inactive' : ''}`}
+                        className={`graph-node ${node.kind} ${node.inactive ? 'inactive' : ''} ${activeHovered === node.id ? 'hovered' : ''}`}
                         transform={`translate(${node.x},${node.y})`}
                         style={{
                           opacity: !visibleNodes.has(node.id)
@@ -923,6 +976,12 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                         onPointerUp={(event) => nodeUp(event, node)}
                       >
                         <circle className="graph-hit" r={16} fill="transparent" />
+                        <circle
+                          className="graph-ring"
+                          r={radius(node) + 5}
+                          fill="none"
+                          style={{ color: node.color }}
+                        />
                         {!node.inactive && (
                           <circle
                             className="graph-glow"
@@ -938,7 +997,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                         ) : shape === 'triangle' ? (
                           <path d="M0,-4.5 L5,4.5 L-5,4.5 Z" fill={node.color} />
                         ) : (
-                          <circle r={shape === 'large-circle' ? 8 : 6} fill={node.color} />
+                          <circle r={radius(node)} fill={node.color} />
                         )}
                         <text
                           className="graph-label"
@@ -946,7 +1005,7 @@ export default function GraphPage({ navigate }: PageProps): React.JSX.Element {
                           textAnchor="middle"
                           style={{
                             fill:
-                              activeHovered && connected.has(node.id)
+                              node.kind === 'purpose' || (activeHovered && connected.has(node.id))
                                 ? 'var(--text)'
                                 : 'var(--muted)'
                           }}

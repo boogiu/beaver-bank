@@ -1821,6 +1821,26 @@ select:focus-visible,
 .graph-label {
   transition: fill 0.2s;
 }
+/* 이름표 둘레에 바탕색 테두리를 둘러, 선이 글자를 지나가도 읽힌다. */
+.graph-label,
+.graph-inactive {
+  paint-order: stroke fill;
+  stroke: var(--menu);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.graph-node.purpose .graph-label {
+  font-weight: 600;
+}
+.graph-node .graph-ring {
+  stroke: currentColor;
+  stroke-width: 1.5px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.graph-node.hovered .graph-ring {
+  opacity: 0.9;
+}
 .graph-label,
 .graph-inactive {
   fill: var(--text);
@@ -1831,6 +1851,124 @@ select:focus-visible,
 }
 .graph-inactive {
   fill: var(--muted);
+}
+/* 물길 보기: 물빛과 나무 갈색 두 가지가 중심이다. */
+.river-region {
+  overflow: auto;
+}
+.river-frame {
+  min-width: 620px;
+}
+.river-svg {
+  display: block;
+}
+.river-reservoir {
+  fill: #4fb6c912;
+  stroke: #4fb6c930;
+  stroke-width: 1px;
+}
+.river-reservoir.loose {
+  fill: none;
+  stroke: var(--border);
+  stroke-dasharray: 4 5;
+}
+.river-title {
+  fill: var(--text);
+  font-family: Pretendard, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+.river-log > circle {
+  fill: var(--brown);
+  stroke: #5a3924;
+  stroke-width: 1px;
+}
+.river-log > .river-log-ring {
+  fill: none;
+  stroke: #b98863;
+  opacity: 0.7;
+}
+.river-stream {
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.river-stream > path {
+  fill: none;
+  stroke: var(--focus);
+  stroke-linecap: round;
+}
+.river-stream.payment > path {
+  stroke: var(--amber);
+}
+.river-stream > .river-current {
+  stroke: #ffffff;
+  opacity: 0.4;
+  stroke-dasharray: 5 15;
+  animation: river-current 1.4s linear infinite;
+}
+@keyframes river-current {
+  from {
+    stroke-dashoffset: 20;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.river-node {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.river-pond {
+  fill: #1d5562;
+  stroke: var(--focus);
+  stroke-width: 1.5px;
+}
+.river-ripple {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1px;
+  stroke-linecap: round;
+  opacity: 0.35;
+}
+.river-spring {
+  fill: var(--focus);
+}
+.river-spring-ring {
+  fill: none;
+  stroke: var(--focus);
+  stroke-width: 1px;
+  opacity: 0.5;
+}
+.river-outflow {
+  fill: var(--amber);
+}
+.river-card {
+  fill: #bababa;
+}
+.river-label {
+  fill: var(--muted);
+}
+.river-node:hover .river-label {
+  fill: var(--text);
+}
+.river-key {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--focus);
+}
+.river-key.pond {
+  width: 16px;
+  background: #1d5562;
+  border: 1.5px solid var(--focus);
+}
+.river-key.dam {
+  background: var(--brown);
+}
+.river-key.outflow {
+  width: 9px;
+  height: 9px;
+  background: var(--amber);
 }
 .graph-legend {
   position: absolute;
