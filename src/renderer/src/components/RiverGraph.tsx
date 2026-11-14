@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Account, Card, Flow, Purpose } from '@shared/ipc'
 import { getReducedMotion } from '../hooks/useReducedMotion'
+import { money } from './domain-ui'
+import mascot from '../assets/illustrations/M1-C-mascot-a2.png'
 
 // 물길 보기: 돈이 왼쪽 샘(수입)에서 솟아 연못(계좌)에 고이고, 비버의 댐(용도)에 갇히거나
 // 하류(정기 결제)로 빠져나가는 모습. 배치는 정해진 네 줄이라 끌거나 확대하지 않는다.
@@ -38,10 +40,10 @@ interface Stream {
   width: number
 }
 
-const ROW = 72
+const ROW = 88
 const HEAD = 24
 const GAP = 22
-const TOP = 74
+const TOP = 104
 
 // 한 달 기준 금액(해마다 한 번인 흐름은 12로 나눈다). 물줄기의 굵기에만 쓴다.
 const monthly = (flow: Flow): number => (flow.cycle === 'yearly' ? flow.amount / 12 : flow.amount)
@@ -91,10 +93,10 @@ export default function RiverGraph({
     observer.observe(element)
     return () => observer.disconnect()
   }, [])
-  const pondX = width * 0.46
+  const pondX = width * 0.4
   const damX = pondX + Math.max(120, Math.min(190, width * 0.17))
   const outX = damX + Math.max(100, Math.min(170, width * 0.14))
-  const springX = width * 0.12
+  const springX = width * 0.09
   const scene = useMemo(() => {
     const cols = { spring: springX, pond: pondX, dam: damX, out: outX }
     const visible = accounts.filter((account) => showInactive || account.isActive)
@@ -151,7 +153,7 @@ export default function RiverGraph({
         x: cols.spring,
         y: pond.get(flow.toAccountId!)!.y
       }))
-    settle(springs, 50, TOP + 20)
+    settle(springs, 64, TOP + 20)
     const outflows: Marker[] = []
     for (const item of ponds) {
       const own = live.filter(
@@ -203,11 +205,17 @@ export default function RiverGraph({
         (flow) =>
           flow.kind === 'transfer' && flow.fromAccountId !== null && flow.toAccountId !== null
       )
-      .forEach((flow, index) => {
-        const source = pond.get(flow.fromAccountId!)!
-        const target = pond.get(flow.toAccountId!)!
+      // 가까운 연못끼리 잇는 물줄기일수록 안쪽 길을 쓰게 해서, 서로 감싸되 엇갈리지 않게 한다.
+      .map((flow) => ({
+        flow,
+        source: pond.get(flow.fromAccountId!)!,
+        target: pond.get(flow.toAccountId!)!
+      }))
+      .sort((a, b) => Math.abs(a.source.y - a.target.y) - Math.abs(b.source.y - b.target.y))
+      .forEach(({ flow, source, target }, index) => {
         // 저수지 칸의 왼쪽 바깥(샘과 저수지 사이)을 곁물길로 삼는다.
-        const bend = cols.pond - 78 - 30 - (index % 5) * 15
+        const lanes = Math.max(1, Math.floor((cols.pond - 78 - 34 - cols.spring - 40) / 13))
+        const bend = cols.pond - 78 - 34 - (index % lanes) * 13
         streams.push({
           key: `t-${flow.id}`,
           from: source.id,
@@ -226,7 +234,7 @@ export default function RiverGraph({
     const height =
       Math.max(
         cursor,
-        ...springs.map((item) => item.y + 40),
+        ...springs.map((item) => item.y + 56),
         ...outflows.map((item) => item.y + 24)
       ) + 8
     return { ponds, reservoirs, springs, outflows, streams, tags, height }
@@ -338,6 +346,10 @@ export default function RiverGraph({
               textAnchor="middle"
             >
               {item.flow.name}
+              <tspan className="river-amount" x={item.x} dy={15}>
+                {money(item.flow.amount)}
+                {item.flow.cycle === 'yearly' && ' (연)'}
+              </tspan>
             </text>
           </g>
         ))}
@@ -364,6 +376,11 @@ export default function RiverGraph({
             >
               {item.account.name}
               {!item.account.isActive && ' (해지)'}
+              {typeof balances.get(item.account.id) === 'number' && (
+                <tspan className="river-amount" x={item.x} dy={15}>
+                  {money(balances.get(item.account.id)!)}
+                </tspan>
+              )}
             </text>
           </g>
         ))}
@@ -375,6 +392,7 @@ export default function RiverGraph({
               className="river-node"
               style={{ opacity: faded(pond.id) ? 0.25 : card.isActive ? 1 : 0.55 }}
               onClick={() => onOpen({ kind: 'card', id: card.id, inactive: !card.isActive })}
+              {...hover(pond.id)}
             >
               <rect
                 className="river-card"
@@ -384,6 +402,15 @@ export default function RiverGraph({
                 height={10}
                 rx={2}
               />
+              {hovered === pond.id && (
+                <text
+                  className="graph-label river-label river-card-name"
+                  x={pond.x + pond.rx * 0.45 + order * 18 + 20}
+                  y={pond.y - pond.ry}
+                >
+                  {card.name}
+                </text>
+              )}
               <title>{card.name}</title>
             </g>
           )
@@ -399,9 +426,24 @@ export default function RiverGraph({
             <circle className="river-outflow" cx={item.x} cy={item.y} r={5} />
             <text className="graph-label river-label" x={item.x + 12} y={item.y + 4}>
               {item.flow.name}
+              <tspan className="river-amount" dx={8}>
+                {money(item.flow.amount)}
+                {item.flow.cycle === 'yearly' && ' (연)'}
+              </tspan>
             </text>
           </g>
         ))}
+        {scene.reservoirs.find((item) => item.purpose) && (
+          <image
+            className="river-beaver"
+            href={mascot}
+            x={cols.dam - 21}
+            y={scene.reservoirs.find((item) => item.purpose)!.top - 34}
+            width={42}
+            height={42}
+            aria-hidden="true"
+          />
+        )}
       </svg>
       <div className="graph-legend river-legend">
         <span>

@@ -1948,6 +1948,19 @@ select:focus-visible,
 .river-label {
   fill: var(--muted);
 }
+.river-amount {
+  fill: var(--muted);
+  font-size: var(--size-xs);
+}
+.river-label .river-amount {
+  opacity: 0.8;
+}
+.river-card-name {
+  fill: var(--text);
+}
+.river-beaver {
+  pointer-events: none;
+}
 .river-node:hover .river-label {
   fill: var(--text);
 }
