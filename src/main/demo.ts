@@ -1,7 +1,8 @@
 import { app } from 'electron'
-import { mkdirSync, rmSync } from 'fs'
+import { mkdirSync } from 'fs'
 import { dirname, join, resolve } from 'path'
 import { getDbPath } from './db'
+import { clearDatabaseFiles } from './db/reset'
 import * as service from './db/service'
 import type { AccountInput, FlowInput, SavingsInput } from '../shared/ipc'
 
@@ -23,22 +24,7 @@ export function resetDemoDatabase(): void {
   if (resolve(app.getPath('userData')) !== expected || resolve(dirname(file)) !== expected) {
     throw new Error('데모 데이터 폴더를 확인하지 못했습니다.')
   }
-  const deadline = Date.now() + 2000
-  const pause = new Int32Array(new SharedArrayBuffer(4))
-  for (const suffix of ['', '-wal', '-shm']) {
-    for (;;) {
-      try {
-        rmSync(file + suffix, { force: true })
-        break
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code
-        if (code !== 'EBUSY' && code !== 'EPERM') throw error
-        const remaining = deadline - Date.now()
-        if (remaining <= 0) throw error
-        Atomics.wait(pause, 0, 0, Math.min(5, remaining))
-      }
-    }
-  }
+  clearDatabaseFiles(file)
 }
 
 export function seedDemo(today = new Date()): void {
