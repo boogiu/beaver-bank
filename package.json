@@ -1,7 +1,7 @@
 {
   "name": "beaver-bank",
   "productName": "BeaverBank",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "비버가 댐으로 물길을 나누듯, 내 돈을 용도별 계좌로 나눠 관리하는 개인용 데스크톱 앱",
   "main": "./out/main/index.js",
